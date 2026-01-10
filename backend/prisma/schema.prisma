@@ -1,0 +1,1254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============== ENUMS ==============
+
+enum UserRole {
+  GUEST
+  USER
+  BUSINESS_OWNER
+  BROKER
+  SANGH_ADMIN
+  TRUST_ADMIN
+  MATRIMONY_ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Sect {
+  DIGAMBAR
+  SHWETAMBAR
+  STHANAKVASI
+  TERAPANTHI
+  OTHER
+}
+
+enum MaritalStatus {
+  NEVER_MARRIED
+  DIVORCED
+  WIDOWED
+  AWAITING_DIVORCE
+}
+
+enum PrivacyLevel {
+  PUBLIC
+  COMMUNITY_ONLY
+  CONNECTIONS_ONLY
+  PRIVATE
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum RSVPStatus {
+  PENDING
+  CONFIRMED
+  ATTENDED
+  CANCELLED
+}
+
+enum DonationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  EXPIRED
+  REJECTED
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  FREELANCE
+}
+
+enum PropertyType {
+  RESIDENTIAL
+  COMMERCIAL
+  INDUSTRIAL
+  LAND
+}
+
+enum PropertyListingType {
+  SALE
+  RENT
+  LEASE
+}
+
+enum ContentStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum ChoGhadiaType {
+  AMRIT
+  SHUBH
+  LABH
+  CHAL
+  ROG
+  KAAL
+  UDVEG
+}
+
+// ============== USER & AUTH ==============
+
+model User {
+  id                String      @id @default(uuid())
+  phone             String      @unique
+  email             String?     @unique
+  passwordHash      String?
+  firstName         String
+  lastName          String
+  profilePhoto      String?
+  gender            Gender?
+  dateOfBirth       DateTime?
+  role              UserRole    @default(USER)
+  status            UserStatus  @default(PENDING)
+
+  // Location
+  cityId            String?
+  city              City?       @relation(fields: [cityId], references: [id])
+  address           String?
+  pincode           String?
+
+  // Community
+  sect              Sect?
+  sanghId           String?
+  sangh             Sangh?      @relation(fields: [sanghId], references: [id])
+  gotra             String?
+
+  // Privacy Settings
+  phonePrivacy      PrivacyLevel @default(COMMUNITY_ONLY)
+  emailPrivacy      PrivacyLevel @default(PRIVATE)
+  profilePrivacy    PrivacyLevel @default(PUBLIC)
+
+  // Verification
+  isPhoneVerified   Boolean     @default(false)
+  isEmailVerified   Boolean     @default(false)
+  isProfileVerified Boolean     @default(false)
+
+  // Timestamps
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  lastLoginAt       DateTime?
+
+  // Relations
+  familyMembers     FamilyMember[]
+  eventRegistrations EventRegistration[]
+  donations         Donation[]
+  businesses        Business[]
+  matrimonyProfile  MatrimonyProfile?
+  tirthBookings     TirthBooking[]
+  jobs              Job[]
+  jobApplications   JobApplication[]
+  storeOrders       StoreOrder[]
+  posts             Post[]
+  comments          Comment[]
+  notifications     Notification[]
+  sentInterests     MatrimonyInterest[] @relation("SentInterests")
+  receivedInterests MatrimonyInterest[] @relation("ReceivedInterests")
+  propertyListings  Property[]
+  feedbacks         EventFeedback[]
+  refreshTokens     RefreshToken[]
+
+  @@index([phone])
+  @@index([cityId])
+  @@index([sect])
+  @@index([status])
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model OTPVerification {
+  id          String   @id @default(uuid())
+  phone       String
+  otp         String
+  purpose     String   @default("login")
+  attempts    Int      @default(0)
+  isUsed      Boolean  @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([phone, purpose])
+}
+
+model FamilyMember {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  relation      String
+  phone         String?
+  dateOfBirth   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============== LOCATION ==============
+
+model City {
+  id          String   @id @default(uuid())
+  name        String
+  state       String
+  country     String   @default("India")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  users       User[]
+  sanghs      Sangh[]
+  events      Event[]
+  businesses  Business[]
+  tirths      Tirth[]
+  properties  Property[]
+
+  @@unique([name, state])
+  @@index([state])
+}
+
+model Sangh {
+  id          String   @id @default(uuid())
+  name        String
+  cityId      String
+  city        City     @relation(fields: [cityId], references: [id])
+  address     String?
+  phone       String?
+  email       String?
+  sect        Sect?
+  isVerified  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  events      Event[]
+
+  @@index([cityId])
+  @@index([sect])
+}
+
+// ============== PANCHANG ==============
+
+model PanchangDay {
+  id              String   @id @default(uuid())
+  date            DateTime @unique
+
+  // Tithi Info
+  tithi           String
+  paksha          String
+  maah            String
+
+  // Timings (stored as time strings for the day)
+  sunrise         String
+  sunset          String
+  navkarshi       String
+
+  // Parv (festival/special day)
+  isParv          Boolean  @default(false)
+  parvName        String?
+  parvDescription String?
+
+  // Choghadia stored separately
+  choghadia       Choghadia[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([date])
+}
+
+model Choghadia {
+  id              String         @id @default(uuid())
+  panchangDayId   String
+  panchangDay     PanchangDay    @relation(fields: [panchangDayId], references: [id], onDelete: Cascade)
+
+  startTime       String
+  endTime         String
+  type            ChoGhadiaType
+  isDay           Boolean        @default(true)
+
+  @@index([panchangDayId])
+}
+
+// ============== EVENTS ==============
+
+model Event {
+  id              String      @id @default(uuid())
+  title           String
+  description     String
+  shortDescription String?
+
+  // Location
+  venue           String
+  address         String
+  cityId          String
+  city            City        @relation(fields: [cityId], references: [id])
+  mapUrl          String?
+  latitude        Float?
+  longitude       Float?
+
+  // Timing
+  startDate       DateTime
+  endDate         DateTime
+  startTime       String?
+  endTime         String?
+
+  // Organization
+  sanghId         String?
+  sangh           Sangh?      @relation(fields: [sanghId], references: [id])
+  organizerName   String
+  organizerPhone  String?
+  organizerEmail  String?
+
+  // Media
+  bannerImage     String?
+  images          String[]
+
+  // Guidelines
+  dressCode       String?
+  prohibitedItems String[]
+  parkingInfo     String?
+  footwearInfo    String?
+
+  // Registration
+  isRegistrationRequired Boolean @default(false)
+  registrationFee       Float?
+  maxAttendees          Int?
+  registrationDeadline  DateTime?
+
+  // Points System
+  attendancePoints      Int      @default(0)
+
+  // Status
+  status          EventStatus @default(DRAFT)
+  isPublic        Boolean     @default(true)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  registrations   EventRegistration[]
+  feedbacks       EventFeedback[]
+
+  @@index([cityId])
+  @@index([startDate])
+  @@index([status])
+}
+
+model EventRegistration {
+  id              String      @id @default(uuid())
+  eventId         String
+  event           Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+
+  // Registration Details
+  attendeeCount   Int         @default(1)
+  attendeeNames   String[]
+
+  // Health & Stay (for multi-day events)
+  hasDiabetes     Boolean?
+  hasBP           Boolean?
+  needsAccommodation Boolean?
+  arrivalDateTime DateTime?
+  specialRequirements String?
+
+  // Payment
+  amount          Float?
+  paymentId       String?
+  paymentStatus   PaymentStatus @default(PENDING)
+
+  // Status
+  status          RSVPStatus  @default(PENDING)
+  checkedInAt     DateTime?
+  pointsEarned    Int         @default(0)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+}
+
+model EventFeedback {
+  id              String   @id @default(uuid())
+  eventId         String
+  event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+
+  // Ratings (1-5)
+  overallRating   Int
+  arrangementRating Int?
+  foodRating      Int?
+  punctualityRating Int?
+
+  suggestion      String?
+  photos          String[]
+
+  createdAt       DateTime @default(now())
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}
+
+// ============== DONATIONS ==============
+
+model DonationCause {
+  id              String   @id @default(uuid())
+  title           String
+  description     String
+  shortDescription String?
+
+  targetAmount    Float?
+  raisedAmount    Float    @default(0)
+
+  // Media
+  image           String?
+  images          String[]
+
+  // Organization
+  organizerName   String
+  organizerPhone  String?
+
+  // Verification
+  isVerified      Boolean  @default(false)
+  verifiedBy      String?
+
+  // Tax
+  is80GEligible   Boolean  @default(false)
+  panNumber       String?
+
+  isActive        Boolean  @default(true)
+  startDate       DateTime @default(now())
+  endDate         DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  donations       Donation[]
+
+  @@index([isActive])
+}
+
+model Donation {
+  id              String         @id @default(uuid())
+  causeId         String
+  cause           DonationCause  @relation(fields: [causeId], references: [id])
+  userId          String?
+  user            User?          @relation(fields: [userId], references: [id])
+
+  // Donor Info (for anonymous donations)
+  donorName       String
+  donorPhone      String
+  donorEmail      String?
+  donorPAN        String?
+
+  amount          Float
+
+  // Payment
+  paymentId       String?
+  paymentMethod   String?
+  transactionId   String?
+
+  // Receipt
+  receiptNumber   String?
+  receiptUrl      String?
+
+  // Status
+  status          DonationStatus @default(PENDING)
+  isAnonymous     Boolean        @default(false)
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([causeId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============== BUSINESS DIRECTORY ==============
+
+model BusinessCategory {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  icon        String?
+  description String?
+  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0)
+
+  businesses  Business[]
+
+  @@index([isActive])
+}
+
+model Business {
+  id              String           @id @default(uuid())
+  ownerId         String
+  owner           User             @relation(fields: [ownerId], references: [id])
+
+  name            String
+  description     String?
+  shortDescription String?
+
+  // Category
+  categoryId      String
+  category        BusinessCategory @relation(fields: [categoryId], references: [id])
+
+  // Contact
+  phone           String
+  alternatePhone  String?
+  email           String?
+  website         String?
+  whatsapp        String?
+
+  // Location
+  address         String
+  cityId          String
+  city            City             @relation(fields: [cityId], references: [id])
+  pincode         String?
+  mapUrl          String?
+  latitude        Float?
+  longitude       Float?
+
+  // Media
+  logo            String?
+  images          String[]
+
+  // Business Hours
+  openingTime     String?
+  closingTime     String?
+  workingDays     String[]
+
+  // Verification & Subscription
+  isVerified      Boolean          @default(false)
+  isFeatured      Boolean          @default(false)
+  subscriptionPlan String?
+  subscriptionEndsAt DateTime?
+
+  // Status
+  status          ListingStatus    @default(PENDING_APPROVAL)
+
+  // Stats
+  viewCount       Int              @default(0)
+  contactCount    Int              @default(0)
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  inquiries       BusinessInquiry[]
+
+  @@index([categoryId])
+  @@index([cityId])
+  @@index([status])
+  @@index([isFeatured])
+}
+
+model BusinessInquiry {
+  id          String   @id @default(uuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  name        String
+  phone       String
+  email       String?
+  message     String?
+
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+}
+
+// ============== MATRIMONY ==============
+
+model MatrimonyProfile {
+  id              String        @id @default(uuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id])
+
+  // Basic Info
+  height          String?
+  weight          String?
+  complexion      String?
+  bodyType        String?
+  bloodGroup      String?
+
+  // Personal
+  maritalStatus   MaritalStatus @default(NEVER_MARRIED)
+  hasChildren     Boolean       @default(false)
+  childrenCount   Int?
+
+  // Education & Career
+  education       String?
+  educationDetail String?
+  profession      String?
+  companyName     String?
+  annualIncome    String?
+  workingCity     String?
+
+  // Family
+  fatherName      String?
+  fatherOccupation String?
+  motherName      String?
+  motherOccupation String?
+  siblings        String?
+  familyType      String?
+  familyStatus    String?
+  nativePlace     String?
+
+  // Religious
+  sect            Sect?
+  subSect         String?
+  gotra           String?
+
+  // Lifestyle
+  diet            String?
+  drinking        String?
+  smoking         String?
+
+  // Partner Preferences
+  preferredAgeMin Int?
+  preferredAgeMax Int?
+  preferredHeightMin String?
+  preferredHeightMax String?
+  preferredEducation String[]
+  preferredProfession String[]
+  preferredCity   String[]
+  preferredSect   Sect[]
+  aboutPartner    String?
+
+  // About
+  aboutMe         String?
+  hobbies         String[]
+
+  // Photos
+  photos          String[]
+
+  // Verification
+  isVerified      Boolean       @default(false)
+  isPhotoVerified Boolean       @default(false)
+
+  // Privacy
+  showPhone       Boolean       @default(false)
+  showEmail       Boolean       @default(false)
+
+  // Status
+  status          ListingStatus @default(PENDING_APPROVAL)
+  isActive        Boolean       @default(true)
+
+  // Stats
+  viewCount       Int           @default(0)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([sect])
+  @@index([status])
+}
+
+model MatrimonyInterest {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("SentInterests", fields: [senderId], references: [id])
+  receiverId  String
+  receiver    User     @relation("ReceivedInterests", fields: [receiverId], references: [id])
+
+  message     String?
+  isAccepted  Boolean?
+  respondedAt DateTime?
+
+  createdAt   DateTime @default(now())
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+// ============== TIRTH & DHARAMSHALA ==============
+
+model Tirth {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+
+  // Location
+  address         String
+  cityId          String
+  city            City     @relation(fields: [cityId], references: [id])
+  state           String
+  pincode         String?
+  mapUrl          String?
+  latitude        Float?
+  longitude       Float?
+
+  // Contact
+  phone           String?
+  email           String?
+  website         String?
+
+  // Media
+  images          String[]
+
+  // Timings
+  openingTime     String?
+  closingTime     String?
+
+  // Features
+  hasDharamshala  Boolean  @default(false)
+  hasParking      Boolean  @default(false)
+  hasBhojanshala  Boolean  @default(false)
+
+  // Verification
+  isVerified      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rooms           DharamshalaRoom[]
+  bookings        TirthBooking[]
+
+  @@index([cityId])
+}
+
+model DharamshalaRoom {
+  id              String   @id @default(uuid())
+  tirthId         String
+  tirth           Tirth    @relation(fields: [tirthId], references: [id], onDelete: Cascade)
+
+  name            String
+  description     String?
+  roomType        String
+  capacity        Int
+  pricePerNight   Float
+
+  // Amenities
+  hasAC           Boolean  @default(false)
+  hasAttachedBath Boolean  @default(true)
+  amenities       String[]
+
+  // Availability
+  totalRooms      Int      @default(1)
+
+  images          String[]
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bookings        TirthBooking[]
+
+  @@index([tirthId])
+}
+
+model TirthBooking {
+  id              String        @id @default(uuid())
+  tirthId         String
+  tirth           Tirth         @relation(fields: [tirthId], references: [id])
+  roomId          String?
+  room            DharamshalaRoom? @relation(fields: [roomId], references: [id])
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+
+  // Booking Details
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  guestCount      Int           @default(1)
+  guestNames      String[]
+
+  // Contact
+  contactPhone    String
+  specialRequests String?
+
+  // Payment
+  totalAmount     Float?
+  paymentId       String?
+  paymentStatus   PaymentStatus @default(PENDING)
+
+  // Status
+  status          BookingStatus @default(PENDING)
+  confirmedAt     DateTime?
+  cancelledAt     DateTime?
+  cancellationReason String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([tirthId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============== E-STORE ==============
+
+model StoreCategory {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  icon        String?
+  description String?
+  parentId    String?
+  parent      StoreCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    StoreCategory[] @relation("CategoryHierarchy")
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+
+  products    StoreProduct[]
+
+  @@index([parentId])
+}
+
+model StoreProduct {
+  id              String        @id @default(uuid())
+  name            String
+  description     String?
+  shortDescription String?
+
+  // Category
+  categoryId      String
+  category        StoreCategory @relation(fields: [categoryId], references: [id])
+
+  // Pricing
+  price           Float
+  comparePrice    Float?
+  costPrice       Float?
+
+  // Inventory
+  sku             String?       @unique
+  quantity        Int           @default(0)
+  lowStockThreshold Int         @default(5)
+
+  // Media
+  images          String[]
+
+  // Details
+  weight          String?
+  dimensions      String?
+  material        String?
+
+  // Shipping
+  isFreeShipping  Boolean       @default(false)
+  shippingCharge  Float?
+
+  // Status
+  isActive        Boolean       @default(true)
+  isFeatured      Boolean       @default(false)
+
+  // Stats
+  viewCount       Int           @default(0)
+  soldCount       Int           @default(0)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  orderItems      StoreOrderItem[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([isFeatured])
+}
+
+model StoreOrder {
+  id              String        @id @default(uuid())
+  orderNumber     String        @unique
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+
+  // Amounts
+  subtotal        Float
+  shippingCharge  Float         @default(0)
+  discount        Float         @default(0)
+  totalAmount     Float
+
+  // Shipping Address
+  shippingName    String
+  shippingPhone   String
+  shippingAddress String
+  shippingCity    String
+  shippingState   String
+  shippingPincode String
+
+  // Payment
+  paymentId       String?
+  paymentMethod   String?
+  paymentStatus   PaymentStatus @default(PENDING)
+
+  // Status
+  status          OrderStatus   @default(PENDING)
+
+  // Tracking
+  trackingNumber  String?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+
+  notes           String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items           StoreOrderItem[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model StoreOrderItem {
+  id          String       @id @default(uuid())
+  orderId     String
+  order       StoreOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     StoreProduct @relation(fields: [productId], references: [id])
+
+  quantity    Int
+  price       Float
+  totalPrice  Float
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ============== JOBS ==============
+
+model Job {
+  id              String    @id @default(uuid())
+  postedById      String
+  postedBy        User      @relation(fields: [postedById], references: [id])
+
+  title           String
+  description     String
+
+  // Company
+  companyName     String
+  companyLogo     String?
+
+  // Job Details
+  jobType         JobType   @default(FULL_TIME)
+  experienceMin   Int?
+  experienceMax   Int?
+  salaryMin       Float?
+  salaryMax       Float?
+  salaryPeriod    String?
+
+  // Location
+  location        String
+  isRemote        Boolean   @default(false)
+
+  // Requirements
+  skills          String[]
+  qualifications  String[]
+
+  // Contact
+  contactEmail    String?
+  contactPhone    String?
+  applyLink       String?
+
+  // Status
+  status          ListingStatus @default(ACTIVE)
+  applicationDeadline DateTime?
+
+  // Stats
+  viewCount       Int       @default(0)
+  applicationCount Int      @default(0)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  applications    JobApplication[]
+
+  @@index([status])
+  @@index([jobType])
+}
+
+model JobApplication {
+  id          String   @id @default(uuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  coverLetter String?
+  resumeUrl   String?
+
+  status      String   @default("applied")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([jobId, userId])
+  @@index([jobId])
+  @@index([userId])
+}
+
+// ============== PROPERTY ==============
+
+model Property {
+  id              String            @id @default(uuid())
+  ownerId         String
+  owner           User              @relation(fields: [ownerId], references: [id])
+
+  title           String
+  description     String?
+
+  propertyType    PropertyType
+  listingType     PropertyListingType
+
+  // Pricing
+  price           Float
+  priceUnit       String?
+  isNegotiable    Boolean           @default(true)
+
+  // Details
+  area            Float?
+  areaUnit        String?
+  bedrooms        Int?
+  bathrooms       Int?
+  floors          Int?
+  furnishing      String?
+  facing          String?
+  ageOfProperty   String?
+
+  // Location
+  address         String
+  cityId          String
+  city            City              @relation(fields: [cityId], references: [id])
+  locality        String?
+  pincode         String?
+  latitude        Float?
+  longitude       Float?
+
+  // Amenities
+  amenities       String[]
+
+  // Media
+  images          String[]
+  videoUrl        String?
+
+  // Contact
+  contactName     String?
+  contactPhone    String
+
+  // Status
+  status          ListingStatus     @default(PENDING_APPROVAL)
+  isFeatured      Boolean           @default(false)
+
+  // Stats
+  viewCount       Int               @default(0)
+  inquiryCount    Int               @default(0)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([cityId])
+  @@index([propertyType])
+  @@index([listingType])
+  @@index([status])
+}
+
+// ============== POSTS & BLOG ==============
+
+model Post {
+  id              String        @id @default(uuid())
+  authorId        String
+  author          User          @relation(fields: [authorId], references: [id])
+
+  title           String?
+  content         String
+
+  // Media
+  images          String[]
+  videoUrl        String?
+
+  // Categorization
+  category        String?
+  tags            String[]
+
+  // Status
+  status          ContentStatus @default(PENDING_REVIEW)
+
+  // Stats
+  viewCount       Int           @default(0)
+  likeCount       Int           @default(0)
+  shareCount      Int           @default(0)
+
+  isPinned        Boolean       @default(false)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  comments        Comment[]
+
+  @@index([authorId])
+  @@index([status])
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  postId      String
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+
+  content     String
+
+  parentId    String?
+  parent      Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     Comment[] @relation("CommentReplies")
+
+  likeCount   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+// ============== NOTIFICATIONS ==============
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  body        String
+  type        String
+
+  // Reference to related entity
+  entityType  String?
+  entityId    String?
+
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// ============== ANNOUNCEMENTS ==============
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  content     String
+
+  image       String?
+  link        String?
+
+  // Target
+  targetCities String[]
+  targetSects  Sect[]
+  isGlobal    Boolean  @default(false)
+
+  // Status
+  isActive    Boolean  @default(true)
+  isPinned    Boolean  @default(false)
+
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+// ============== ADMIN & AUDIT ==============
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  action      String
+  entityType  String
+  entityId    String?
+  oldValue    Json?
+  newValue    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model AppSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  updatedAt   DateTime @updatedAt
+}

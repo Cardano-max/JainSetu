@@ -1,0 +1,29 @@
+{
+  "name": "jainsetu",
+  "version": "1.0.0",
+  "description": "JainSetu - All-in-One App for Jain Community",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "admin",
+    "shared"
+  ],
+  "scripts": {
+    "backend": "npm run dev --workspace=backend",
+    "admin": "npm run dev --workspace=admin",
+    "build:backend": "npm run build --workspace=backend",
+    "build:admin": "npm run build --workspace=admin",
+    "start:backend": "npm run start --workspace=backend",
+    "db:migrate": "npm run migrate --workspace=backend",
+    "db:seed": "npm run seed --workspace=backend"
+  },
+  "keywords": [
+    "jain",
+    "community",
+    "panchang",
+    "matrimony",
+    "events"
+  ],
+  "author": "JainSetu",
+  "license": "MIT"
+}
