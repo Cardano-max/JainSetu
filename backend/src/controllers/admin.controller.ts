@@ -17,7 +17,9 @@ export class AdminController {
         totalDonations,
         donationsThisMonth,
         totalBusinesses,
-        pendingApprovals,
+        pendingBusinesses,
+        pendingMatrimony,
+        pendingProperties,
       ] = await Promise.all([
         prisma.user.count({ where: { status: 'ACTIVE' } }),
         prisma.user.count({ where: { createdAt: { gte: today } } }),
@@ -35,10 +37,12 @@ export class AdminController {
           _sum: { amount: true },
         }),
         prisma.business.count({ where: { status: 'ACTIVE' } }),
-        prisma.business.count({ where: { status: 'PENDING_APPROVAL' } }) +
-          prisma.matrimonyProfile.count({ where: { status: 'PENDING_APPROVAL' } }) +
-          prisma.property.count({ where: { status: 'PENDING_APPROVAL' } }),
+        prisma.business.count({ where: { status: 'PENDING_APPROVAL' } }),
+        prisma.matrimonyProfile.count({ where: { status: 'PENDING_APPROVAL' } }),
+        prisma.property.count({ where: { status: 'PENDING_APPROVAL' } }),
       ]);
+
+      const pendingApprovals = pendingBusinesses + pendingMatrimony + pendingProperties;
 
       // Recent activities
       const recentUsers = await prisma.user.findMany({
