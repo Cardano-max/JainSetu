@@ -1,7 +1,31 @@
-import { PrismaClient, Sect, UserRole, ChoGhadiaType } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
+// Define enums locally to avoid Prisma client initialization issues
+const Sect = {
+  DIGAMBAR: 'DIGAMBAR',
+  SHWETAMBAR: 'SHWETAMBAR',
+  STHANAKVASI: 'STHANAKVASI',
+} as const;
+
+const UserRole = {
+  USER: 'USER',
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  SANGH_ADMIN: 'SANGH_ADMIN',
+  TRUST_ADMIN: 'TRUST_ADMIN',
+  MATRIMONY_ADMIN: 'MATRIMONY_ADMIN',
+} as const;
+
+const ChoGhadiaType = {
+  AMRIT: 'AMRIT',
+  SHUBH: 'SHUBH',
+  LABH: 'LABH',
+  CHAL: 'CHAL',
+  ROG: 'ROG',
+  KAAL: 'KAAL',
+  UDVEG: 'UDVEG',
+} as const;
 
 async function main() {
   console.log('Starting seed...');
@@ -406,7 +430,7 @@ async function main() {
     'Ekadashi', 'Dwadashi', 'Trayodashi', 'Chaturdashi', 'Purnima',
   ];
 
-  const choGhadiaTypes: ChoGhadiaType[] = ['AMRIT', 'SHUBH', 'LABH', 'CHAL', 'ROG', 'KAAL', 'UDVEG'];
+  const choGhadiaTypes = [ChoGhadiaType.AMRIT, ChoGhadiaType.SHUBH, ChoGhadiaType.LABH, ChoGhadiaType.CHAL, ChoGhadiaType.ROG, ChoGhadiaType.KAAL, ChoGhadiaType.UDVEG];
 
   for (let i = 0; i < 7; i++) {
     const date = new Date();

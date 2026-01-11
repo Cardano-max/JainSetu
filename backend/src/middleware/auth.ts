@@ -2,11 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
 import { AppError } from './errorHandler.js';
-import { UserRole } from '@prisma/client';
+
+// Define UserRole locally to avoid Prisma client initialization issues
+export enum UserRole {
+  USER = 'USER',
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  SANGH_ADMIN = 'SANGH_ADMIN',
+  TRUST_ADMIN = 'TRUST_ADMIN',
+  MATRIMONY_ADMIN = 'MATRIMONY_ADMIN',
+}
 
 export interface JWTPayload {
   userId: string;
-  role: UserRole;
+  role: string;
 }
 
 declare global {
@@ -14,7 +22,7 @@ declare global {
     interface Request {
       user?: {
         id: string;
-        role: UserRole;
+        role: string;
       };
     }
   }
@@ -117,7 +125,7 @@ export const optionalAuth = async (
   }
 };
 
-export const requireRoles = (...roles: UserRole[]) => {
+export const requireRoles = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AppError('Authentication required', 401));
