@@ -109,10 +109,17 @@ async function main() {
 
   console.log(`Created ${sanghs.length} sanghs`);
 
-  // Create Admin User
+  // Create Admin User - IMPORTANT: update clause ensures status is always ACTIVE
   const adminUser = await prisma.user.upsert({
     where: { phone: '9999999999' },
-    update: {},
+    update: {
+      // Always ensure admin is ACTIVE and has correct role
+      status: 'ACTIVE',
+      role: UserRole.SUPER_ADMIN,
+      isPhoneVerified: true,
+      isEmailVerified: true,
+      isProfileVerified: true,
+    },
     create: {
       phone: '9999999999',
       email: 'admin@jainsetu.com',
