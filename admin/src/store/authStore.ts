@@ -9,6 +9,7 @@ interface User {
   firstName: string;
   lastName: string;
   role: string;
+  status?: string;
 }
 
 interface AuthState {
@@ -35,23 +36,26 @@ export const useAuthStore = create<AuthState>()(
           throw new Error('Access denied. Admin role required.');
         }
 
-        set({ user, token: accessToken, isAuthenticated: true });
+        // Set token in axios defaults immediately
         api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+        set({ user, token: accessToken, isAuthenticated: true });
       },
 
       logout: () => {
-        set({ user: null, token: null, isAuthenticated: false });
         delete api.defaults.headers.common['Authorization'];
+        set({ user: null, token: null, isAuthenticated: false });
+        localStorage.removeItem('jainsetu-admin-auth');
       },
 
       setAuth: (user: User, token: string) => {
-        set({ user, token, isAuthenticated: true });
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        set({ user, token, isAuthenticated: true });
       },
     }),
     {
       name: 'jainsetu-admin-auth',
-      onRehydrate: (state) => {
+      onRehydrateStorage: () => (state) => {
+        // Called after rehydration is complete
         if (state?.token) {
           api.defaults.headers.common['Authorization'] = `Bearer ${state.token}`;
         }
@@ -59,3 +63,19 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Initialize auth on module load - restore token from storage immediately
+const initAuth = () => {
+  try {
+    const stored = localStorage.getItem('jainsetu-admin-auth');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed?.state?.token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${parsed.state.token}`;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to initialize auth:', e);
+  }
+};
+initAuth();

@@ -268,6 +268,85 @@ export class DonationController {
     }
   };
 
+  // Admin: Get All Causes (including inactive)
+  getAllCauses = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { page = '1', limit = '50', search, isActive } = req.query;
+
+      const where: any = {};
+      if (isActive !== undefined && isActive !== '') {
+        where.isActive = isActive === 'true';
+      }
+      if (search) {
+        where.OR = [
+          { title: { contains: search as string, mode: 'insensitive' } },
+          { organizerName: { contains: search as string, mode: 'insensitive' } },
+        ];
+      }
+
+      const [causes, total] = await Promise.all([
+        prisma.donationCause.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take: parseInt(limit as string),
+          skip: (parseInt(page as string) - 1) * parseInt(limit as string),
+        }),
+        prisma.donationCause.count({ where }),
+      ]);
+
+      res.json({
+        success: true,
+        causes,
+        pagination: {
+          page: parseInt(page as string),
+          limit: parseInt(limit as string),
+          total,
+          totalPages: Math.ceil(total / parseInt(limit as string)),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // Admin: Get All Donations
+  getAllDonations = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { page = '1', limit = '50', causeId, status } = req.query;
+
+      const where: any = {};
+      if (causeId) where.causeId = causeId;
+      if (status) where.status = status;
+
+      const [donations, total] = await Promise.all([
+        prisma.donation.findMany({
+          where,
+          include: {
+            cause: { select: { title: true } },
+            user: { select: { firstName: true, lastName: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: parseInt(limit as string),
+          skip: (parseInt(page as string) - 1) * parseInt(limit as string),
+        }),
+        prisma.donation.count({ where }),
+      ]);
+
+      res.json({
+        success: true,
+        donations,
+        pagination: {
+          page: parseInt(page as string),
+          limit: parseInt(limit as string),
+          total,
+          totalPages: Math.ceil(total / parseInt(limit as string)),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // Admin: Create Cause
   createCause = async (req: Request, res: Response, next: NextFunction) => {
     try {

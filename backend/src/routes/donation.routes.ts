@@ -21,8 +21,10 @@ router.get('/my', authenticate, donationController.getMyDonations);
 router.get('/my/:id/receipt', authenticate, donationController.getReceipt);
 
 // Admin routes
+router.get('/admin/causes', authenticate, requireAdmin, donationController.getAllCauses);
+router.get('/admin/donations', authenticate, requireAdmin, donationController.getAllDonations);
 router.post('/causes', authenticate, requireAdmin, validateBody(createCauseSchema), donationController.createCause);
-router.put('/causes/:id', authenticate, requireAdmin, validateBody(createCauseSchema), donationController.updateCause);
+router.put('/causes/:id', authenticate, requireAdmin, donationController.updateCause);
 router.delete('/causes/:id', authenticate, requireAdmin, donationController.deleteCause);
 router.get('/causes/:id/donations', authenticate, requireAdmin, donationController.getCauseDonations);
 
