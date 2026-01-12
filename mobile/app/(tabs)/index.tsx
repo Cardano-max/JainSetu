@@ -71,28 +71,28 @@ export default function HomeScreen() {
         router.push('/(tabs)/directory');
         break;
       case 'panchang':
-        router.push('/panchang');
+        router.push('/(screens)/panchang');
         break;
       case 'donations':
-        router.push('/donations');
+        router.push('/(screens)/donations');
         break;
       case 'businesses':
-        router.push('/businesses');
+        router.push('/(screens)/businesses');
         break;
       case 'matrimony':
-        router.push('/matrimony');
+        router.push('/(screens)/matrimony');
         break;
       case 'tirth':
-        router.push('/tirth');
+        router.push('/(screens)/tirth');
         break;
       case 'store':
-        router.push('/store');
+        router.push('/(screens)/store');
         break;
       case 'jobs':
-        router.push('/jobs');
+        router.push('/(screens)/jobs');
         break;
       case 'profile':
-        router.push('/profile');
+        router.push('/(screens)/profile');
         break;
       default:
         break;
@@ -130,7 +130,7 @@ export default function HomeScreen() {
         {panchang && (
           <TouchableOpacity
             style={styles.panchangCard}
-            onPress={() => router.push('/panchang')}
+            onPress={() => router.push('/(screens)/panchang')}
           >
             <View style={styles.panchangHeader}>
               <View>
