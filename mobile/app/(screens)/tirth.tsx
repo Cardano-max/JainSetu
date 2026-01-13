@@ -49,7 +49,7 @@ export default function TirthScreen() {
   const fetchPlaces = useCallback(async () => {
     try {
       const response = await api.get('/tirth');
-      setPlaces(response.data.places || []);
+      setPlaces(response.places || []);
     } catch (error) {
       console.error('Failed to fetch tirth places:', error);
       // Demo data

@@ -55,7 +55,7 @@ export default function BusinessesScreen() {
   const fetchBusinesses = useCallback(async () => {
     try {
       const response = await api.get('/businesses');
-      const data = response.data.businesses || [];
+      const data = response.businesses || [];
       setBusinesses(data);
       setFilteredBusinesses(data);
     } catch (error) {

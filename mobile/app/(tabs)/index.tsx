@@ -56,7 +56,7 @@ export default function HomeScreen() {
   const fetchPanchang = async () => {
     try {
       const response = await api.get('/panchang/today');
-      setPanchang(response.data.panchang);
+      setPanchang(response.panchang);
     } catch (error) {
       console.error('Failed to fetch panchang');
     }

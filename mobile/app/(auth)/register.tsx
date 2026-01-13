@@ -42,7 +42,7 @@ export default function RegisterScreen() {
   const fetchCities = async () => {
     try {
       const response = await api.get('/locations/cities');
-      setCities(response.data.cities);
+      setCities(response.cities || []);
     } catch (error) {
       console.error('Failed to fetch cities');
     }

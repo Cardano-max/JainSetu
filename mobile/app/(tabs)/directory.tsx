@@ -38,7 +38,7 @@ export default function DirectoryScreen() {
       if (search) params.set('search', search);
 
       const response = await api.get(`/businesses?${params}`);
-      setBusinesses(response.data.businesses);
+      setBusinesses(response.businesses || []);
     } catch (error) {
       console.error('Failed to fetch businesses');
     } finally {

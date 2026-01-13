@@ -53,7 +53,7 @@ export default function EventsScreen() {
   const fetchEvents = useCallback(async () => {
     try {
       const response = await api.get('/events/upcoming?limit=20');
-      setEvents(response.data.events || []);
+      setEvents(response.events || []);
     } catch (error) {
       console.error('Failed to fetch events:', error);
       // Demo data

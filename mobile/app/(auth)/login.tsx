@@ -32,12 +32,12 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const response = await api.post('/auth/send-otp', { phone, purpose: 'login' });
-      if (response.data.success) {
+      if (response.success) {
         setOtpSent(true);
         Alert.alert('Success', 'OTP sent successfully');
         // Show OTP in dev mode
-        if (response.data.otp) {
-          Alert.alert('Dev Mode', `OTP: ${response.data.otp}`);
+        if (response.otp) {
+          Alert.alert('Dev Mode', `OTP: ${response.otp}`);
         }
       }
     } catch (error: any) {

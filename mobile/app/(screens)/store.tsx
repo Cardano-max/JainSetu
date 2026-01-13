@@ -46,7 +46,7 @@ export default function StoreScreen() {
   const fetchProducts = useCallback(async () => {
     try {
       const response = await api.get('/store/products');
-      setProducts(response.data.products || []);
+      setProducts(response.products || []);
     } catch (error) {
       console.error('Failed to fetch products:', error);
       // Demo data
