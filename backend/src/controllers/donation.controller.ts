@@ -1,8 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import { prisma } from '../index.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { CreateCauseInput, MakeDonationInput, CreatePaymentOrderInput } from '../schemas/donation.schema.js';
-import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
+
+// Initialize Razorpay instance
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || '',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || '',
+});
+
+// Check if Razorpay is configured
+const isRazorpayConfigured = (): boolean => {
+  return !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+};
 
 export class DonationController {
   // Get Active Causes
@@ -95,6 +108,15 @@ export class DonationController {
     try {
       const { amount, causeId } = req.body as CreatePaymentOrderInput;
 
+      // Validate amount
+      if (amount < 1) {
+        throw new AppError('Amount must be at least ₹1', 400);
+      }
+
+      if (amount > 1000000) {
+        throw new AppError('Amount cannot exceed ₹10,00,000', 400);
+      }
+
       // Verify cause exists
       const cause = await prisma.donationCause.findUnique({
         where: { id: causeId },
@@ -104,20 +126,160 @@ export class DonationController {
         throw new AppError('Cause not found or inactive', 404);
       }
 
-      // In production, create Razorpay order
-      // For now, return a mock order ID
-      const orderId = `order_${uuidv4().replace(/-/g, '').substring(0, 14)}`;
+      // Check if Razorpay is configured
+      if (!isRazorpayConfigured()) {
+        logger.warn('Razorpay not configured, using mock order');
+        // Return mock order for development
+        const mockOrderId = `order_mock_${Date.now()}`;
+        return res.json({
+          success: true,
+          order: {
+            id: mockOrderId,
+            amount: amount * 100,
+            currency: 'INR',
+          },
+          isMock: true,
+        });
+      }
+
+      // Create Razorpay order
+      const order = await razorpay.orders.create({
+        amount: amount * 100, // Razorpay expects amount in paise
+        currency: 'INR',
+        receipt: `donation_${causeId}_${Date.now()}`,
+        notes: {
+          causeId,
+          causeName: cause.title,
+        },
+      });
+
+      logger.info(`Created Razorpay order ${order.id} for cause ${causeId}`);
 
       res.json({
         success: true,
         order: {
-          id: orderId,
-          amount: amount * 100, // Razorpay expects amount in paise
-          currency: 'INR',
+          id: order.id,
+          amount: order.amount,
+          currency: order.currency,
         },
       });
     } catch (error) {
       next(error);
+    }
+  };
+
+  // Verify Payment (webhook handler and client verification)
+  verifyPayment = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { paymentId, orderId, signature } = req.body;
+
+      if (!paymentId || !orderId || !signature) {
+        throw new AppError('Missing payment verification parameters', 400);
+      }
+
+      // Check if Razorpay is configured
+      if (!isRazorpayConfigured()) {
+        logger.warn('Razorpay not configured, skipping verification');
+        return res.json({ success: true, verified: true, isMock: true });
+      }
+
+      // Verify signature
+      const generatedSignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+        .update(`${orderId}|${paymentId}`)
+        .digest('hex');
+
+      const isValid = generatedSignature === signature;
+
+      if (!isValid) {
+        logger.warn(`Payment verification failed for order ${orderId}`);
+        throw new AppError('Payment verification failed', 400);
+      }
+
+      logger.info(`Payment ${paymentId} verified successfully`);
+
+      res.json({ success: true, verified: true });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // Razorpay Webhook Handler
+  handleWebhook = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+      if (!webhookSecret) {
+        logger.warn('Razorpay webhook secret not configured');
+        return res.status(200).json({ success: true });
+      }
+
+      // Verify webhook signature
+      const signature = req.headers['x-razorpay-signature'] as string;
+      const body = JSON.stringify(req.body);
+
+      const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(body)
+        .digest('hex');
+
+      if (signature !== expectedSignature) {
+        logger.warn('Invalid webhook signature');
+        return res.status(400).json({ error: 'Invalid signature' });
+      }
+
+      const event = req.body.event;
+      const payload = req.body.payload;
+
+      logger.info(`Received webhook event: ${event}`);
+
+      switch (event) {
+        case 'payment.captured':
+          // Payment was successful
+          const paymentId = payload.payment.entity.id;
+          const orderId = payload.payment.entity.order_id;
+          const amount = payload.payment.entity.amount / 100;
+
+          logger.info(`Payment captured: ${paymentId}, Order: ${orderId}, Amount: ${amount}`);
+
+          // Update donation status if exists
+          await prisma.donation.updateMany({
+            where: { paymentId },
+            data: { status: 'COMPLETED' },
+          });
+          break;
+
+        case 'payment.failed':
+          // Payment failed
+          const failedPaymentId = payload.payment.entity.id;
+          logger.warn(`Payment failed: ${failedPaymentId}`);
+
+          await prisma.donation.updateMany({
+            where: { paymentId: failedPaymentId },
+            data: { status: 'FAILED' },
+          });
+          break;
+
+        case 'refund.created':
+          // Refund initiated
+          const refundPaymentId = payload.refund.entity.payment_id;
+          logger.info(`Refund created for payment: ${refundPaymentId}`);
+
+          await prisma.donation.updateMany({
+            where: { paymentId: refundPaymentId },
+            data: { status: 'REFUNDED' },
+          });
+          break;
+
+        default:
+          logger.info(`Unhandled webhook event: ${event}`);
+      }
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      logger.error('Webhook handler error:', error);
+      // Always return 200 to acknowledge receipt (Razorpay will retry otherwise)
+      res.status(200).json({ success: true });
     }
   };
 
@@ -126,6 +288,11 @@ export class DonationController {
     try {
       const data = req.body as MakeDonationInput;
       const userId = req.user?.id;
+
+      // Validate amount
+      if (data.amount < 1) {
+        throw new AppError('Amount must be at least ₹1', 400);
+      }
 
       // Verify cause
       const cause = await prisma.donationCause.findUnique({
@@ -139,7 +306,7 @@ export class DonationController {
       // Generate receipt number
       const receiptNumber = `JSD${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
-      // Create donation
+      // Create donation with PENDING status initially
       const donation = await prisma.donation.create({
         data: {
           causeId: data.causeId,
@@ -152,46 +319,37 @@ export class DonationController {
           paymentId: data.paymentId,
           paymentMethod: data.paymentMethod || 'online',
           isAnonymous: data.isAnonymous,
-          status: 'COMPLETED',
+          status: data.paymentId ? 'COMPLETED' : 'PENDING',
           receiptNumber,
         },
         include: { cause: true },
       });
 
-      // Update cause raised amount
-      await prisma.donationCause.update({
-        where: { id: data.causeId },
-        data: { raisedAmount: { increment: data.amount } },
-      });
-
-      // Create notification if user is logged in
-      if (userId) {
-        await prisma.notification.create({
-          data: {
-            userId,
-            title: 'Thank You for Your Donation',
-            body: `Your donation of ₹${data.amount} to ${cause.title} has been received.`,
-            type: 'donation',
-            entityType: 'donation',
-            entityId: donation.id,
-          },
+      // Update cause raised amount if payment is completed
+      if (donation.status === 'COMPLETED') {
+        await prisma.donationCause.update({
+          where: { id: data.causeId },
+          data: { raisedAmount: { increment: data.amount } },
         });
+
+        // Create notification if user is logged in
+        if (userId) {
+          await prisma.notification.create({
+            data: {
+              userId,
+              title: 'Thank You for Your Donation',
+              body: `Your donation of ₹${data.amount} to ${cause.title} has been received.`,
+              type: 'donation',
+              entityType: 'donation',
+              entityId: donation.id,
+            },
+          });
+        }
+
+        logger.info(`Donation ${donation.id} completed: ₹${data.amount} to ${cause.title}`);
       }
 
       res.status(201).json({ success: true, donation });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  // Verify Payment (webhook handler)
-  verifyPayment = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { paymentId, orderId, signature } = req.body;
-
-      // In production, verify with Razorpay
-      // For now, just acknowledge
-      res.json({ success: true, verified: true });
     } catch (error) {
       next(error);
     }
@@ -360,6 +518,8 @@ export class DonationController {
         },
       });
 
+      logger.info(`Created donation cause: ${cause.id} - ${cause.title}`);
+
       res.status(201).json({ success: true, cause });
     } catch (error) {
       next(error);
@@ -380,6 +540,8 @@ export class DonationController {
           endDate: data.endDate ? new Date(data.endDate) : null,
         },
       });
+
+      logger.info(`Updated donation cause: ${cause.id}`);
 
       res.json({ success: true, cause });
     } catch (error) {
@@ -403,8 +565,10 @@ export class DonationController {
           where: { id },
           data: { isActive: false },
         });
+        logger.info(`Soft deleted donation cause: ${id} (has ${donationCount} donations)`);
       } else {
         await prisma.donationCause.delete({ where: { id } });
+        logger.info(`Deleted donation cause: ${id}`);
       }
 
       res.json({ success: true, message: 'Cause deleted' });

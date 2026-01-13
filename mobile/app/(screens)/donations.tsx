@@ -7,17 +7,21 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Image,
   Alert,
   TextInput,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import api from '@/lib/api';
+import api, { classifyError } from '@/lib/api';
 import colors from '@/lib/colors';
 import { useAuthStore } from '@/lib/store';
+import { usePayment } from '@/lib/usePayment';
+import { useDebouncedPress } from '@/lib/useDebouncedPress';
+import axios from 'axios';
 
 interface DonationCause {
   id: string;
@@ -32,21 +36,44 @@ interface DonationCause {
 
 export default function DonationsScreen() {
   const { user, isAuthenticated } = useAuthStore();
+  const { isProcessing, processDonation, error: paymentError, clearError } = usePayment();
+
   const [causes, setCauses] = useState<DonationCause[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [donateModal, setDonateModal] = useState(false);
   const [selectedCause, setSelectedCause] = useState<DonationCause | null>(null);
+
+  // Form state
   const [amount, setAmount] = useState('');
-  const [donating, setDonating] = useState(false);
+  const [donorName, setDonorName] = useState('');
+  const [donorPhone, setDonorPhone] = useState('');
+  const [donorEmail, setDonorEmail] = useState('');
+  const [donorPAN, setDonorPAN] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  // Pre-fill form with user data
+  useEffect(() => {
+    if (user) {
+      setDonorName(`${user.firstName || ''} ${user.lastName || ''}`.trim());
+      setDonorPhone(user.phone || '');
+      setDonorEmail(user.email || '');
+    }
+  }, [user]);
 
   const fetchCauses = useCallback(async () => {
     try {
-      const response = await api.get('/donations/causes');
-      setCauses(response.data.causes || []);
+      const response = await api.get<{ success: boolean; causes: DonationCause[] }>('/donations/causes');
+      setCauses(response.causes || []);
     } catch (error) {
       console.error('Failed to fetch causes:', error);
-      // Demo data
+      if (axios.isAxiosError(error)) {
+        const apiError = classifyError(error);
+        if (apiError.code !== 'NETWORK_ERROR') {
+          Alert.alert('Error', apiError.userMessage);
+        }
+      }
+      // Fallback demo data for offline/error scenarios
       setCauses([
         {
           id: '1',
@@ -95,33 +122,74 @@ export default function DonationsScreen() {
     }
     setSelectedCause(cause);
     setAmount('');
+    clearError();
     setDonateModal(true);
   };
 
-  const submitDonation = async () => {
-    if (!amount || parseInt(amount) < 1) {
-      Alert.alert('Invalid Amount', 'Please enter a valid donation amount');
-      return;
+  const validateForm = (): boolean => {
+    const amountNum = parseInt(amount);
+
+    if (!amount || isNaN(amountNum) || amountNum < 1) {
+      Alert.alert('Invalid Amount', 'Please enter a valid donation amount (minimum ₹1)');
+      return false;
     }
 
-    setDonating(true);
-    try {
-      await api.post('/donations', {
-        causeId: selectedCause?.id,
-        amount: parseInt(amount),
-      });
-      Alert.alert(
-        'Thank You!',
-        'Your donation has been received. May your generosity bring blessings.',
-        [{ text: 'OK', onPress: () => setDonateModal(false) }]
-      );
-      fetchCauses();
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.error || 'Failed to process donation');
-    } finally {
-      setDonating(false);
+    if (amountNum > 1000000) {
+      Alert.alert('Amount Too Large', 'Maximum donation amount is ₹10,00,000. Please contact us for larger donations.');
+      return false;
     }
+
+    if (!donorName.trim()) {
+      Alert.alert('Name Required', 'Please enter your name');
+      return false;
+    }
+
+    if (!donorPhone.trim() || !/^[6-9]\d{9}$/.test(donorPhone.trim())) {
+      Alert.alert('Invalid Phone', 'Please enter a valid 10-digit Indian phone number');
+      return false;
+    }
+
+    if (donorEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(donorEmail)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      return false;
+    }
+
+    if (donorPAN && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(donorPAN.toUpperCase())) {
+      Alert.alert('Invalid PAN', 'Please enter a valid PAN number (e.g., ABCDE1234F)');
+      return false;
+    }
+
+    return true;
   };
+
+  const submitDonation = useDebouncedPress(async () => {
+    if (!validateForm() || !selectedCause) return;
+
+    try {
+      const result = await processDonation(
+        selectedCause.id,
+        parseInt(amount),
+        {
+          name: donorName.trim(),
+          phone: donorPhone.trim(),
+          email: donorEmail.trim() || undefined,
+          pan: donorPAN.trim().toUpperCase() || undefined,
+          isAnonymous,
+        }
+      );
+
+      if (result.success) {
+        Alert.alert(
+          'Thank You!',
+          'Your donation has been received. May your generosity bring blessings.',
+          [{ text: 'OK', onPress: () => setDonateModal(false) }]
+        );
+        fetchCauses(); // Refresh to show updated amounts
+      }
+    } catch (error: any) {
+      Alert.alert('Donation Failed', error.message || 'Failed to process donation. Please try again.');
+    }
+  }, 1000);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -232,7 +300,10 @@ export default function DonationsScreen() {
         transparent={true}
         onRequestClose={() => setDonateModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Make a Donation</Text>
@@ -241,64 +312,132 @@ export default function DonationsScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalCauseTitle}>{selectedCause?.title}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalCauseTitle}>{selectedCause?.title}</Text>
 
-            {/* Quick Amount Buttons */}
-            <View style={styles.quickAmounts}>
-              {[100, 500, 1000, 5000].map((amt) => (
-                <TouchableOpacity
-                  key={amt}
-                  style={[
-                    styles.quickAmountBtn,
-                    amount === amt.toString() && styles.quickAmountBtnActive,
-                  ]}
-                  onPress={() => setAmount(amt.toString())}
-                >
-                  <Text
+              {/* Quick Amount Buttons */}
+              <View style={styles.quickAmounts}>
+                {[100, 500, 1000, 5000].map((amt) => (
+                  <TouchableOpacity
+                    key={amt}
                     style={[
-                      styles.quickAmountText,
-                      amount === amt.toString() && styles.quickAmountTextActive,
+                      styles.quickAmountBtn,
+                      amount === amt.toString() && styles.quickAmountBtnActive,
                     ]}
+                    onPress={() => setAmount(amt.toString())}
                   >
-                    ₹{amt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      style={[
+                        styles.quickAmountText,
+                        amount === amt.toString() && styles.quickAmountTextActive,
+                      ]}
+                    >
+                      ₹{amt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={styles.inputLabel}>Or enter custom amount</Text>
-            <View style={styles.amountInputContainer}>
-              <Text style={styles.currencySymbol}>₹</Text>
+              <Text style={styles.inputLabel}>Or enter custom amount</Text>
+              <View style={styles.amountInputContainer}>
+                <Text style={styles.currencySymbol}>₹</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  placeholder="Enter amount"
+                  value={amount}
+                  onChangeText={(text) => setAmount(text.replace(/\D/g, ''))}
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.gray[400]}
+                  maxLength={7}
+                />
+              </View>
+
+              {/* Donor Information */}
+              <Text style={styles.sectionTitle}>Donor Information</Text>
+
+              <Text style={styles.inputLabel}>Full Name *</Text>
               <TextInput
-                style={styles.amountInput}
-                placeholder="Enter amount"
-                value={amount}
-                onChangeText={(text) => setAmount(text.replace(/\D/g, ''))}
-                keyboardType="numeric"
+                style={styles.textInput}
+                placeholder="Enter your name"
+                value={donorName}
+                onChangeText={setDonorName}
                 placeholderTextColor={colors.gray[400]}
               />
-            </View>
 
-            <TouchableOpacity
-              style={[styles.submitButton, donating && styles.submitButtonDisabled]}
-              onPress={submitDonation}
-              disabled={donating}
-            >
-              {donating ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.submitButtonText}>
-                  Donate {amount ? `₹${amount}` : ''}
-                </Text>
+              <Text style={styles.inputLabel}>Phone Number *</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="10-digit phone number"
+                value={donorPhone}
+                onChangeText={setDonorPhone}
+                keyboardType="phone-pad"
+                placeholderTextColor={colors.gray[400]}
+                maxLength={10}
+              />
+
+              <Text style={styles.inputLabel}>Email (Optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="your@email.com"
+                value={donorEmail}
+                onChangeText={setDonorEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={colors.gray[400]}
+              />
+
+              <Text style={styles.inputLabel}>PAN Number (For 80G receipt)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="ABCDE1234F"
+                value={donorPAN}
+                onChangeText={(text) => setDonorPAN(text.toUpperCase())}
+                autoCapitalize="characters"
+                placeholderTextColor={colors.gray[400]}
+                maxLength={10}
+              />
+
+              {/* Anonymous checkbox */}
+              <TouchableOpacity
+                style={styles.checkboxRow}
+                onPress={() => setIsAnonymous(!isAnonymous)}
+              >
+                <View style={[styles.checkbox, isAnonymous && styles.checkboxChecked]}>
+                  {isAnonymous && (
+                    <Ionicons name="checkmark" size={16} color={colors.white} />
+                  )}
+                </View>
+                <Text style={styles.checkboxLabel}>Make my donation anonymous</Text>
+              </TouchableOpacity>
+
+              {paymentError && (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="alert-circle" size={16} color={colors.red[500]} />
+                  <Text style={styles.errorText}>{paymentError}</Text>
+                </View>
               )}
-            </TouchableOpacity>
 
-            <Text style={styles.secureText}>
-              <Ionicons name="lock-closed" size={12} color={colors.gray[400]} />
-              {' '}Secure payment powered by Razorpay
-            </Text>
+              <TouchableOpacity
+                style={[styles.submitButton, isProcessing && styles.submitButtonDisabled]}
+                onPress={submitDonation}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.submitButtonText}>
+                    Donate {amount ? `₹${parseInt(amount).toLocaleString('en-IN')}` : ''}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.securePayment}>
+                <Ionicons name="lock-closed" size={14} color={colors.gray[400]} />
+                <Text style={styles.secureText}>Secure payment powered by Razorpay</Text>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -435,6 +574,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -478,6 +618,13 @@ const styles = StyleSheet.create({
   quickAmountTextActive: {
     color: colors.white,
   },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.gray[900],
+    marginTop: 16,
+    marginBottom: 12,
+  },
   inputLabel: {
     fontSize: 14,
     color: colors.gray[500],
@@ -504,6 +651,53 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: colors.gray[900],
   },
+  textInput: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: colors.gray[900],
+    marginBottom: 16,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.gray[300],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.saffron[600],
+    borderColor: colors.saffron[600],
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: colors.gray[700],
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.red[50],
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    color: colors.red[600],
+    marginLeft: 8,
+    flex: 1,
+  },
   submitButton: {
     backgroundColor: colors.saffron[600],
     paddingVertical: 16,
@@ -518,10 +712,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  securePayment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 20,
+  },
   secureText: {
     fontSize: 12,
     color: colors.gray[400],
-    textAlign: 'center',
-    marginTop: 16,
+    marginLeft: 6,
   },
 });
