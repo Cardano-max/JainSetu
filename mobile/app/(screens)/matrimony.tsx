@@ -48,7 +48,7 @@ export default function MatrimonyScreen() {
   const fetchProfiles = useCallback(async () => {
     try {
       const response = await api.get('/matrimony/profiles');
-      setProfiles(response.profiles || []);
+      setProfiles(response?.profiles || []);
     } catch (error) {
       console.error('Failed to fetch profiles:', error);
       // Demo data

@@ -48,7 +48,7 @@ export default function JobsScreen() {
   const fetchJobs = useCallback(async () => {
     try {
       const response = await api.get('/jobs');
-      setJobs(response.jobs || []);
+      setJobs(response?.jobs || []);
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
       // Demo data
