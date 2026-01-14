@@ -1,27 +1,20 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
   FlatList,
   Linking,
-  Dimensions,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import api from '@/lib/api';
 import colors from '@/lib/colors';
-import { useLocationWeather } from '@/lib/useLocationWeather';
-
-const { width, height } = Dimensions.get('window');
-const MAP_HEIGHT = height * 0.35;
 
 interface Tirth {
   id: string;
@@ -168,29 +161,15 @@ const DEMO_PLACES: Tirth[] = [
 ];
 
 export default function TirthScreen() {
-  const mapRef = useRef<MapView>(null);
-  const { location: userLocation } = useLocationWeather();
-
   const [places, setPlaces] = useState<Tirth[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedType, setSelectedType] = useState('all');
-  const [showMap, setShowMap] = useState(true);
-  const [selectedPlace, setSelectedPlace] = useState<Tirth | null>(null);
-
-  // Initial map region (centered on India)
-  const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: 23.0,
-    longitude: 77.0,
-    latitudeDelta: 12,
-    longitudeDelta: 12,
-  });
 
   const fetchPlaces = useCallback(async () => {
     try {
       const response = await api.get('/tirth');
       const apiPlaces = response?.places || response?.tirths || [];
-      // Merge API data with demo data for coordinates
       setPlaces(apiPlaces.length > 0 ? apiPlaces : DEMO_PLACES);
     } catch (error) {
       console.error('Failed to fetch tirth places:', error);
@@ -204,19 +183,6 @@ export default function TirthScreen() {
   useEffect(() => {
     fetchPlaces();
   }, [fetchPlaces]);
-
-  // Update map region when user location changes
-  useEffect(() => {
-    if (userLocation && mapRef.current) {
-      // Optional: Center on user location
-      // mapRef.current.animateToRegion({
-      //   latitude: userLocation.latitude,
-      //   longitude: userLocation.longitude,
-      //   latitudeDelta: 5,
-      //   longitudeDelta: 5,
-      // });
-    }
-  }, [userLocation]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -233,25 +199,27 @@ export default function TirthScreen() {
 
   const handleNavigate = (place: Tirth) => {
     if (place.latitude && place.longitude) {
-      // Open in Google Maps or Apple Maps
-      const scheme = Platform.select({ ios: 'maps:', android: 'geo:' });
+      // Open in Google Maps
       const url = Platform.select({
         ios: `maps:?daddr=${place.latitude},${place.longitude}&q=${encodeURIComponent(place.name)}`,
         android: `geo:${place.latitude},${place.longitude}?q=${place.latitude},${place.longitude}(${encodeURIComponent(place.name)})`,
       });
       Linking.openURL(url!);
+    } else {
+      // Search by name if no coordinates
+      const query = encodeURIComponent(`${place.name}, ${place.city}, ${place.state}`);
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
     }
   };
 
-  const handleMarkerPress = (place: Tirth) => {
-    setSelectedPlace(place);
-    if (place.latitude && place.longitude && mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: place.latitude,
-        longitude: place.longitude,
-        latitudeDelta: 1,
-        longitudeDelta: 1,
-      }, 500);
+  const handleViewOnMap = (place: Tirth) => {
+    // Open Google Maps in browser/app
+    if (place.latitude && place.longitude) {
+      const url = `https://www.google.com/maps?q=${place.latitude},${place.longitude}`;
+      Linking.openURL(url);
+    } else {
+      const query = encodeURIComponent(`${place.name}, ${place.city}, ${place.state}`);
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
     }
   };
 
@@ -281,19 +249,6 @@ export default function TirthScreen() {
     }
   };
 
-  const getMarkerColor = (type: string) => {
-    switch (type) {
-      case 'tirth':
-        return '#f97316'; // saffron
-      case 'dharamshala':
-        return '#22c55e'; // green
-      case 'temple':
-        return '#8b5cf6'; // purple
-      default:
-        return '#6b7280';
-    }
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -307,69 +262,16 @@ export default function TirthScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Stack.Screen
-        options={{
-          title: 'Tirth & Dharamshala',
-          headerRight: () => (
-            <TouchableOpacity
-              style={styles.mapToggle}
-              onPress={() => setShowMap(!showMap)}
-            >
-              <Ionicons
-                name={showMap ? 'list' : 'map'}
-                size={24}
-                color={colors.saffron[600]}
-              />
-            </TouchableOpacity>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ title: 'Tirth & Dharamshala' }} />
 
-      {/* Map View */}
-      {showMap && (
-        <View style={styles.mapContainer}>
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-            initialRegion={mapRegion}
-            showsUserLocation
-            showsMyLocationButton
-          >
-            {filteredPlaces.map((place) =>
-              place.latitude && place.longitude ? (
-                <Marker
-                  key={place.id}
-                  coordinate={{
-                    latitude: place.latitude,
-                    longitude: place.longitude,
-                  }}
-                  title={place.name}
-                  description={`${place.city}, ${place.state}`}
-                  pinColor={getMarkerColor(place.type)}
-                  onPress={() => handleMarkerPress(place)}
-                />
-              ) : null
-            )}
-          </MapView>
-
-          {/* Map Legend */}
-          <View style={styles.mapLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#f97316' }]} />
-              <Text style={styles.legendText}>Tirth</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#8b5cf6' }]} />
-              <Text style={styles.legendText}>Temple</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#22c55e' }]} />
-              <Text style={styles.legendText}>Dharamshala</Text>
-            </View>
-          </View>
-        </View>
-      )}
+      {/* View All on Map Button */}
+      <TouchableOpacity
+        style={styles.viewAllMapButton}
+        onPress={() => Linking.openURL('https://www.google.com/maps/search/jain+temples+india')}
+      >
+        <Ionicons name="map" size={20} color={colors.white} />
+        <Text style={styles.viewAllMapText}>View All on Google Maps</Text>
+      </TouchableOpacity>
 
       {/* Type Filter */}
       <View style={styles.typeFilter}>
@@ -405,14 +307,17 @@ export default function TirthScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={[
-              styles.placeCard,
-              selectedPlace?.id === item.id && styles.placeCardSelected,
-            ]}
-            onPress={() => handleMarkerPress(item)}
+            style={styles.placeCard}
+            onPress={() => handleViewOnMap(item)}
           >
             <View style={styles.placeImagePlaceholder}>
               <Ionicons name={getTypeIcon(item.type) as any} size={40} color={getTypeColor(item.type)} />
+              {item.latitude && item.longitude && (
+                <View style={styles.mapBadge}>
+                  <Ionicons name="location" size={12} color={colors.white} />
+                  <Text style={styles.mapBadgeText}>Map</Text>
+                </View>
+              )}
             </View>
             <View style={styles.placeContent}>
               <View style={styles.placeHeader}>
@@ -466,10 +371,10 @@ export default function TirthScreen() {
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
-                    style={styles.actionButton}
+                    style={[styles.actionButton, styles.navigateButton]}
                     onPress={() => handleNavigate(item)}
                   >
-                    <Ionicons name="navigate" size={18} color={colors.saffron[600]} />
+                    <Ionicons name="navigate" size={18} color={colors.white} />
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionButton}>
                     <Ionicons name="bookmark-outline" size={18} color={colors.saffron[600]} />
@@ -504,39 +409,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mapToggle: {
-    padding: 8,
-  },
-  mapContainer: {
-    height: MAP_HEIGHT,
-    position: 'relative',
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  mapLegend: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 8,
-    padding: 8,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  legendItem: {
+  viewAllMapButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.saffron[600],
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
   },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 4,
-  },
-  legendText: {
-    fontSize: 10,
-    color: colors.gray[700],
+  viewAllMapText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
   },
   typeFilter: {
     flexDirection: 'row',
@@ -575,15 +462,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
   },
-  placeCardSelected: {
-    borderWidth: 2,
-    borderColor: colors.saffron[500],
-  },
   placeImagePlaceholder: {
     height: 120,
     backgroundColor: colors.saffron[100],
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  mapBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: colors.saffron[600],
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  mapBadgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '600',
   },
   placeContent: {
     padding: 16,
@@ -684,6 +585,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 6,
+  },
+  navigateButton: {
+    backgroundColor: colors.saffron[600],
   },
   emptyContainer: {
     flex: 1,
