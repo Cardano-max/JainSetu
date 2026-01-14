@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +16,8 @@ import { router } from 'expo-router';
 import { useAuthStore } from '@/lib/store';
 import api from '@/lib/api';
 import colors from '@/lib/colors';
+import { useLocationWeather } from '@/lib/useLocationWeather';
+import { weatherService } from '@/lib/weather';
 
 const { width } = Dimensions.get('window');
 
@@ -49,6 +53,17 @@ export default function HomeScreen() {
   const { user } = useAuthStore();
   const [panchang, setPanchang] = useState<PanchangData | null>(null);
 
+  // Location & Weather Hook
+  const {
+    location,
+    locationLoading,
+    localTime,
+    weather,
+    weatherLoading,
+    forecast,
+    refresh,
+  } = useLocationWeather();
+
   useEffect(() => {
     fetchPanchang();
   }, []);
@@ -56,7 +71,7 @@ export default function HomeScreen() {
   const fetchPanchang = async () => {
     try {
       const response = await api.get('/panchang/today');
-      setPanchang(response.panchang);
+      setPanchang(response?.panchang);
     } catch (error) {
       console.error('Failed to fetch panchang');
     }
@@ -99,6 +114,13 @@ export default function HomeScreen() {
     }
   };
 
+  const getWeatherIcon = () => {
+    if (!weather) return 'partly-sunny';
+    const hour = new Date().getHours();
+    const isDay = hour >= 6 && hour < 18;
+    return weatherService.getWeatherIcon(weather.condition, isDay);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -108,7 +130,9 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>Jai Jinendra, {user?.firstName || 'Guest'}</Text>
             <View style={styles.locationRow}>
               <Ionicons name="location" size={14} color={colors.saffron[600]} />
-              <Text style={styles.location}>{user?.city?.name || 'Select City'}</Text>
+              <Text style={styles.location}>
+                {locationLoading ? 'Detecting...' : (location?.city || user?.city?.name || 'Select City')}
+              </Text>
             </View>
           </View>
           <TouchableOpacity style={styles.notificationBtn}>
@@ -126,6 +150,90 @@ export default function HomeScreen() {
           />
         </View>
 
+        {/* Weather & Time Card */}
+        <View style={styles.weatherCard}>
+          <View style={styles.weatherMain}>
+            <View style={styles.weatherLeft}>
+              {weatherLoading ? (
+                <ActivityIndicator size="small" color={colors.saffron[600]} />
+              ) : (
+                <>
+                  <Ionicons
+                    name={getWeatherIcon() as any}
+                    size={48}
+                    color={colors.saffron[500]}
+                  />
+                  <View style={styles.tempContainer}>
+                    <Text style={styles.temperature}>
+                      {weather?.temperature || '--'}°C
+                    </Text>
+                    <Text style={styles.weatherDesc}>
+                      {weather?.description || 'Loading...'}
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+            <View style={styles.weatherRight}>
+              <Text style={styles.timeText}>{localTime?.time || '--:--'}</Text>
+              <Text style={styles.dateText}>{localTime?.day || ''}</Text>
+              <Text style={styles.dateText}>{localTime?.date || ''}</Text>
+            </View>
+          </View>
+
+          {/* Weather Details Row */}
+          {weather && (
+            <View style={styles.weatherDetails}>
+              <View style={styles.weatherDetailItem}>
+                <Ionicons name="water-outline" size={16} color={colors.saffron[600]} />
+                <Text style={styles.weatherDetailText}>{weather.humidity}%</Text>
+              </View>
+              <View style={styles.weatherDetailItem}>
+                <Ionicons name="speedometer-outline" size={16} color={colors.saffron[600]} />
+                <Text style={styles.weatherDetailText}>{weather.windSpeed} km/h</Text>
+              </View>
+              <View style={styles.weatherDetailItem}>
+                <Ionicons name="eye-outline" size={16} color={colors.saffron[600]} />
+                <Text style={styles.weatherDetailText}>{weather.visibility} km</Text>
+              </View>
+              <View style={styles.weatherDetailItem}>
+                <Ionicons name="thermometer-outline" size={16} color={colors.saffron[600]} />
+                <Text style={styles.weatherDetailText}>Feels {weather.feelsLike}°</Text>
+              </View>
+            </View>
+          )}
+
+          {/* 5-Day Forecast Mini */}
+          {forecast && forecast.items.length > 0 && (
+            <View style={styles.forecastRow}>
+              {forecast.items.slice(0, 5).map((item, index) => (
+                <View key={index} style={styles.forecastItem}>
+                  <Text style={styles.forecastDay}>
+                    {index === 0 ? 'Today' : new Date(item.date).toLocaleDateString('en-IN', { weekday: 'short' })}
+                  </Text>
+                  <Ionicons
+                    name={weatherService.getWeatherIcon(item.condition, true) as any}
+                    size={20}
+                    color={colors.saffron[500]}
+                  />
+                  <Text style={styles.forecastTemp}>{item.temperature}°</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Location Info */}
+          <View style={styles.locationInfo}>
+            <Ionicons name="navigate" size={12} color={colors.gray[400]} />
+            <Text style={styles.locationText}>
+              {location ? `${location.city}, ${location.state}` : 'Detecting location...'}
+            </Text>
+            <TouchableOpacity onPress={refresh} style={styles.refreshBtn}>
+              <Ionicons name="refresh" size={14} color={colors.saffron[600]} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Panchang Widget */}
         {panchang && (
           <TouchableOpacity
@@ -135,30 +243,27 @@ export default function HomeScreen() {
             <View style={styles.panchangHeader}>
               <View>
                 <View style={styles.panchangLocation}>
-                  <Ionicons name="location" size={14} color={colors.saffron[600]} />
-                  <Text style={styles.panchangCity}>{user?.city?.name || 'Surat'}</Text>
+                  <Ionicons name="calendar" size={14} color={colors.saffron[600]} />
+                  <Text style={styles.panchangCity}>Jain Panchang</Text>
                 </View>
                 <Text style={styles.panchangDate}>
-                  {new Date().toLocaleDateString('en-IN', {
-                    weekday: 'short',
-                    day: 'numeric',
-                    month: 'short',
-                  })}
+                  {panchang.maah} | {panchang.paksha}
                 </Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
             </View>
             <Text style={styles.panchangTithi}>{panchang.tithi}</Text>
             <View style={styles.panchangTimes}>
               <View style={styles.timeItem}>
-                <Text style={styles.timeIcon}>🌅</Text>
-                <Text style={styles.timeValue}>{panchang.sunrise}</Text>
+                <Ionicons name="sunny-outline" size={16} color={colors.yellow[600]} />
+                <Text style={styles.timeValue}> {panchang.sunrise}</Text>
               </View>
               <View style={styles.timeItem}>
-                <Text style={styles.timeIcon}>🌇</Text>
-                <Text style={styles.timeValue}>{panchang.sunset}</Text>
+                <Ionicons name="moon-outline" size={16} color={colors.saffron[600]} />
+                <Text style={styles.timeValue}> {panchang.sunset}</Text>
               </View>
               <View style={styles.timeItem}>
-                <Text style={[styles.timeValue, { color: colors.saffron[600] }]}>
+                <Text style={[styles.timeValue, { color: colors.saffron[600], fontWeight: '600' }]}>
                   Navkarshi: {panchang.navkarshi}
                 </Text>
               </View>
@@ -240,6 +345,112 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.gray[900],
   },
+  // Weather Card Styles
+  weatherCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  weatherMain: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  weatherLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tempContainer: {
+    marginLeft: 12,
+  },
+  temperature: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.gray[900],
+  },
+  weatherDesc: {
+    fontSize: 14,
+    color: colors.gray[600],
+    textTransform: 'capitalize',
+  },
+  weatherRight: {
+    alignItems: 'flex-end',
+  },
+  timeText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.saffron[600],
+  },
+  dateText: {
+    fontSize: 12,
+    color: colors.gray[500],
+    marginTop: 2,
+  },
+  weatherDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+    marginBottom: 8,
+  },
+  weatherDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  weatherDetailText: {
+    fontSize: 12,
+    color: colors.gray[600],
+    marginLeft: 4,
+  },
+  forecastRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+  },
+  forecastItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  forecastDay: {
+    fontSize: 10,
+    color: colors.gray[500],
+    marginBottom: 4,
+  },
+  forecastTemp: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.gray[700],
+    marginTop: 4,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+  },
+  locationText: {
+    fontSize: 11,
+    color: colors.gray[400],
+    marginLeft: 4,
+  },
+  refreshBtn: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  // Panchang Card Styles
   panchangCard: {
     backgroundColor: colors.white,
     marginHorizontal: 20,
@@ -255,6 +466,7 @@ const styles = StyleSheet.create({
   panchangHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   panchangLocation: {
@@ -263,7 +475,8 @@ const styles = StyleSheet.create({
   },
   panchangCity: {
     fontSize: 14,
-    color: colors.gray[600],
+    fontWeight: '600',
+    color: colors.gray[700],
     marginLeft: 4,
   },
   panchangDate: {

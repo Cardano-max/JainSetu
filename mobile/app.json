@@ -17,14 +17,30 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jainsetu.app"
+      "bundleIdentifier": "com.jainsetu.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "JainSetu needs your location to show nearby temples, dharamshalas, and local weather.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "JainSetu needs your location to show nearby temples, dharamshalas, and local weather."
+      },
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_IOS_API_KEY"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#f97316"
       },
-      "package": "com.jainsetu.app"
+      "package": "com.jainsetu.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_ANDROID_API_KEY"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -33,7 +49,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "JainSetu needs your location to show nearby temples, dharamshalas, and local weather."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
