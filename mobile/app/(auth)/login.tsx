@@ -13,60 +13,35 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/lib/store';
-import api from '@/lib/api';
 import colors from '@/lib/colors';
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuthStore();
 
-  const handleSendOtp = async () => {
-    if (phone.length < 10) {
-      Alert.alert('Error', 'Please enter a valid phone number');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await api.post('/auth/send-otp', { phone, purpose: 'login' });
-      if (response.success) {
-        setOtpSent(true);
-        Alert.alert('Success', 'OTP sent successfully');
-        // Show OTP in dev mode
-        if (response.otp) {
-          Alert.alert('Dev Mode', `OTP: ${response.otp}`);
-        }
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.error || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLogin = async () => {
-    if (otp.length !== 6) {
-      Alert.alert('Error', 'Please enter a valid 6-digit OTP');
+    if (phone.length < 10) {
+      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
 
     setLoading(true);
     try {
-      const result = await login(phone, otp);
+      const result = await login(phone);
 
       if (result.isNewUser) {
+        // New user - go to registration
         router.replace({
           pathname: '/(auth)/register',
-          params: { phone, registrationToken: result.registrationToken },
+          params: { phone },
         });
       } else {
+        // Existing user - go to home
         router.replace('/(tabs)');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.error || 'Login failed');
+      Alert.alert('Error', error.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -109,55 +84,23 @@ export default function LoginScreen() {
                     onChangeText={(text) => setPhone(text.replace(/\D/g, ''))}
                     keyboardType="phone-pad"
                     maxLength={10}
-                    editable={!otpSent}
                   />
                 </View>
               </View>
 
-              {!otpSent ? (
-                <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
-                  onPress={handleSendOtp}
-                  disabled={loading || phone.length < 10}
-                >
-                  <Text style={styles.buttonText}>
-                    {loading ? 'Sending...' : 'Send OTP'}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>OTP</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter 6-digit OTP"
-                      value={otp}
-                      onChangeText={(text) => setOtp(text.replace(/\D/g, ''))}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                    />
-                  </View>
+              <TouchableOpacity
+                style={[styles.button, (loading || phone.length < 10) && styles.buttonDisabled]}
+                onPress={handleLogin}
+                disabled={loading || phone.length < 10}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Text>
+              </TouchableOpacity>
 
-                  <TouchableOpacity
-                    onPress={() => {
-                      setOtpSent(false);
-                      setOtp('');
-                    }}
-                  >
-                    <Text style={styles.changePhone}>Change phone number</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.button, loading && styles.buttonDisabled]}
-                    onPress={handleLogin}
-                    disabled={loading || otp.length !== 6}
-                  >
-                    <Text style={styles.buttonText}>
-                      {loading ? 'Signing in...' : 'Sign In'}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
+              <Text style={styles.demoNote}>
+                Demo Mode: Enter any 10-digit number to login
+              </Text>
             </View>
           </View>
         </ScrollView>
@@ -280,9 +223,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  changePhone: {
-    color: colors.saffron[600],
-    fontSize: 14,
-    marginBottom: 16,
+  demoNote: {
+    fontSize: 12,
+    color: colors.gray[400],
+    textAlign: 'center',
+    marginTop: 16,
   },
 });

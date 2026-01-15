@@ -17,9 +17,8 @@ import api from '@/lib/api';
 import colors from '@/lib/colors';
 
 export default function RegisterScreen() {
-  const { phone, registrationToken } = useLocalSearchParams<{
+  const { phone } = useLocalSearchParams<{
     phone: string;
-    registrationToken: string;
   }>();
 
   const { register } = useAuthStore();
@@ -57,11 +56,11 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register({
-        phone,
-        registrationToken,
+        phone: phone || '',
+        registrationToken: 'demo-token', // Demo mode - no OTP needed
         ...form,
-        cityId: form.cityId || null,
-        sect: form.sect || null,
+        cityId: form.cityId || undefined,
+        sect: form.sect || undefined,
       });
       router.replace('/(tabs)');
     } catch (error: any) {

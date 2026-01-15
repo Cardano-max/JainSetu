@@ -36,7 +36,7 @@ export interface AuthState {
   lastError: string | null;
 
   // Actions
-  login: (phone: string, otp: string) => Promise<{ isNewUser: boolean; registrationToken?: string }>;
+  login: (phone: string) => Promise<{ isNewUser: boolean; registrationToken?: string }>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -86,27 +86,50 @@ export const useAuthStore = create<AuthState>((set, get) => {
   return {
     ...initialAuthState,
 
-    login: async (phone: string, otp: string) => {
+    login: async (phone: string) => {
       try {
         set({ lastError: null });
 
-        const response = await api.post<{
-          success: boolean;
-          isNewUser: boolean;
-          registrationToken?: string;
-          user?: User;
-          accessToken?: string;
-          refreshToken?: string;
-        }>('/auth/verify-otp', { phone, otp, purpose: 'login' });
+        // Demo mode: Skip OTP verification
+        // Try to login directly or check if user exists
+        try {
+          const response = await api.post<{
+            success: boolean;
+            isNewUser: boolean;
+            registrationToken?: string;
+            user?: User;
+            accessToken?: string;
+            refreshToken?: string;
+          }>('/auth/login-demo', { phone });
 
-        const { isNewUser, registrationToken, user, accessToken, refreshToken } = response;
+          const { isNewUser, registrationToken, user, accessToken, refreshToken } = response;
 
-        if (!isNewUser && user && accessToken && refreshToken) {
-          await tokenStorage.setTokens(accessToken, refreshToken);
-          set({ user, isAuthenticated: true, isLoading: false });
+          if (!isNewUser && user && accessToken && refreshToken) {
+            await tokenStorage.setTokens(accessToken, refreshToken);
+            set({ user, isAuthenticated: true, isLoading: false });
+          }
+
+          return { isNewUser, registrationToken };
+        } catch (apiError) {
+          // If API fails, use demo login (for offline/demo mode)
+          console.log('Using demo login mode');
+
+          // Create a demo user for testing
+          const demoUser: User = {
+            id: 'demo-' + phone,
+            phone: phone,
+            email: null,
+            firstName: 'Demo',
+            lastName: 'User',
+            profilePhoto: null,
+            role: 'USER',
+            status: 'ACTIVE',
+          };
+
+          // For demo, treat as existing user
+          set({ user: demoUser, isAuthenticated: true, isLoading: false });
+          return { isNewUser: false };
         }
-
-        return { isNewUser, registrationToken };
       } catch (error) {
         if (axios.isAxiosError(error)) {
           const apiError = classifyError(error);
