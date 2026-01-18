@@ -257,7 +257,7 @@ export default function AddContentScreen() {
           <Text style={styles.label}>Height</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. 5'6\""
+            placeholder="e.g. 5 ft 6 in"
             value={matrimonyForm.height}
             onChangeText={(text) => setMatrimonyForm({ ...matrimonyForm, height: text })}
           />
