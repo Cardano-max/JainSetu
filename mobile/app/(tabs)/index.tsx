@@ -9,7 +9,6 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +19,7 @@ import colors from '@/lib/colors';
 import { useLocationWeather } from '@/lib/useLocationWeather';
 import { weatherService } from '@/lib/weather';
 import Stories from '@/components/Stories';
+import HomeSlider from '@/components/HomeSlider';
 
 const { width } = Dimensions.get('window');
 
@@ -41,13 +41,13 @@ const menuItems = [
   { id: 'matrimony', title: 'Matrimony', icon: 'heart-circle', color: '#f43f5e' },
   { id: 'tirth', title: 'Tirth & Dharamshala', icon: 'location', color: '#14b8a6' },
   { id: 'jobs', title: 'Jobs', icon: 'briefcase', color: '#6366f1' },
-  { id: 'posts', title: 'Posts & Blog', icon: 'newspaper', color: '#f97316' },
+  { id: 'festival-post', title: 'Festival Post', icon: 'sparkles', color: '#f97316' },
+  { id: 'posts', title: 'Posts & Blog', icon: 'newspaper', color: '#ea580c' },
   { id: 'store', title: 'Store', icon: 'cart', color: '#22c55e' },
-  { id: 'travel', title: 'Travel & Recharge', icon: 'airplane', color: '#0ea5e9' },
-  { id: 'insurance', title: 'Insurance & Finance', icon: 'shield-checkmark', color: '#dc2626' },
-  { id: 'property', title: 'Property & Brokers', icon: 'home', color: '#7c3aed' },
-  { id: 'education', title: 'Education', icon: 'school', color: '#0891b2' },
-  { id: 'healthcare', title: 'Healthcare', icon: 'medkit', color: '#e11d48' },
+  { id: 'messenger', title: 'Messages', icon: 'chatbubbles', color: '#0ea5e9' },
+  { id: 'travel', title: 'Travel & Recharge', icon: 'airplane', color: '#06b6d4' },
+  { id: 'insurance', title: 'Insurance', icon: 'shield-checkmark', color: '#dc2626' },
+  { id: 'property', title: 'Property', icon: 'home', color: '#7c3aed' },
   { id: 'profile', title: 'My Profile', icon: 'person', color: '#64748b' },
 ];
 
@@ -111,6 +111,15 @@ export default function HomeScreen() {
       case 'profile':
         router.push('/(screens)/profile');
         break;
+      case 'festival-post':
+        router.push('/(screens)/festival-post');
+        break;
+      case 'messenger':
+        router.push('/(screens)/messenger');
+        break;
+      case 'posts':
+        router.push('/(screens)/posts');
+        break;
       default:
         break;
     }
@@ -141,35 +150,25 @@ export default function HomeScreen() {
             {/* Add Content Button */}
             <TouchableOpacity
               style={styles.headerBtn}
-              onPress={() => {
-                Alert.alert(
-                  'Create Content',
-                  'What would you like to create?',
-                  [
-                    { text: 'Add Story', onPress: () => Alert.alert('Coming Soon', 'Story feature coming soon!') },
-                    { text: 'Create Post', onPress: () => router.push('/(screens)/posts') },
-                    { text: 'Cancel', style: 'cancel' },
-                  ]
-                );
-              }}
+              onPress={() => router.push('/(screens)/add-content')}
             >
               <Ionicons name="add-circle-outline" size={26} color={colors.gray[700]} />
             </TouchableOpacity>
             {/* Messenger Button */}
             <TouchableOpacity
               style={styles.headerBtn}
-              onPress={() => {
-                Alert.alert('Messages', 'Messaging feature coming soon!');
-              }}
+              onPress={() => router.push('/(screens)/messenger')}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.gray[700]} />
+              {/* Unread badge - demo */}
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>3</Text>
+              </View>
             </TouchableOpacity>
             {/* Notifications */}
             <TouchableOpacity
               style={styles.headerBtn}
-              onPress={() => {
-                Alert.alert('Notifications', 'No new notifications');
-              }}
+              onPress={() => router.push('/(screens)/notifications')}
             >
               <Ionicons name="notifications-outline" size={24} color={colors.gray[700]} />
             </TouchableOpacity>
@@ -188,14 +187,11 @@ export default function HomeScreen() {
 
         {/* Stories */}
         <Stories
-          onAddStory={() => {
-            Alert.alert(
-              'Add Story',
-              'Story upload feature coming soon! You will be able to share moments with the Jain community.',
-              [{ text: 'OK' }]
-            );
-          }}
+          onAddStory={() => router.push('/(screens)/add-content?type=story')}
         />
+
+        {/* Home Slider - Recent modules, Ads, Posts */}
+        <HomeSlider />
 
         {/* Weather & Time Card */}
         <View style={styles.weatherCard}>
@@ -380,6 +376,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
+    position: 'relative',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: colors.red[500],
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  unreadBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.white,
   },
   searchContainer: {
     flexDirection: 'row',
