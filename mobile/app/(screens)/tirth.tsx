@@ -199,12 +199,16 @@ export default function TirthScreen() {
 
   const handleNavigate = (place: Tirth) => {
     if (place.latitude && place.longitude) {
-      // Open in Google Maps
-      const url = Platform.select({
-        ios: `maps:?daddr=${place.latitude},${place.longitude}&q=${encodeURIComponent(place.name)}`,
-        android: `geo:${place.latitude},${place.longitude}?q=${place.latitude},${place.longitude}(${encodeURIComponent(place.name)})`,
+      // Use Google Maps URL which works on both platforms
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}&destination_place_id=${encodeURIComponent(place.name)}`;
+      Linking.openURL(url).catch(() => {
+        // Fallback to geo: scheme if web URL fails
+        const geoUrl = Platform.select({
+          ios: `maps:?daddr=${place.latitude},${place.longitude}`,
+          android: `geo:${place.latitude},${place.longitude}?q=${place.latitude},${place.longitude}`,
+        });
+        if (geoUrl) Linking.openURL(geoUrl);
       });
-      Linking.openURL(url!);
     } else {
       // Search by name if no coordinates
       const query = encodeURIComponent(`${place.name}, ${place.city}, ${place.state}`);
@@ -418,12 +422,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 12,
     borderRadius: 10,
-    gap: 8,
   },
   viewAllMapText: {
     color: colors.white,
     fontSize: 14,
     fontWeight: '600',
+    marginLeft: 8,
   },
   typeFilter: {
     flexDirection: 'row',
@@ -479,12 +483,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    gap: 4,
   },
   mapBadgeText: {
     color: colors.white,
     fontSize: 10,
     fontWeight: '600',
+    marginLeft: 4,
   },
   placeContent: {
     padding: 16,

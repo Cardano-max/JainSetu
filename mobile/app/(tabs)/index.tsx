@@ -9,6 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ import api from '@/lib/api';
 import colors from '@/lib/colors';
 import { useLocationWeather } from '@/lib/useLocationWeather';
 import { weatherService } from '@/lib/weather';
+import Stories from '@/components/Stories';
 
 const { width } = Dimensions.get('window');
 
@@ -135,9 +137,43 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.notificationBtn}>
-            <Ionicons name="notifications-outline" size={24} color={colors.gray[700]} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {/* Add Content Button */}
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => {
+                Alert.alert(
+                  'Create Content',
+                  'What would you like to create?',
+                  [
+                    { text: 'Add Story', onPress: () => Alert.alert('Coming Soon', 'Story feature coming soon!') },
+                    { text: 'Create Post', onPress: () => router.push('/(screens)/posts') },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="add-circle-outline" size={26} color={colors.gray[700]} />
+            </TouchableOpacity>
+            {/* Messenger Button */}
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => {
+                Alert.alert('Messages', 'Messaging feature coming soon!');
+              }}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.gray[700]} />
+            </TouchableOpacity>
+            {/* Notifications */}
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => {
+                Alert.alert('Notifications', 'No new notifications');
+              }}
+            >
+              <Ionicons name="notifications-outline" size={24} color={colors.gray[700]} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search */}
@@ -149,6 +185,17 @@ export default function HomeScreen() {
             placeholderTextColor={colors.gray[400]}
           />
         </View>
+
+        {/* Stories */}
+        <Stories
+          onAddStory={() => {
+            Alert.alert(
+              'Add Story',
+              'Story upload feature coming soon! You will be able to share moments with the Jain community.',
+              [{ text: 'OK' }]
+            );
+          }}
+        />
 
         {/* Weather & Time Card */}
         <View style={styles.weatherCard}>
@@ -190,11 +237,11 @@ export default function HomeScreen() {
               </View>
               <View style={styles.weatherDetailItem}>
                 <Ionicons name="speedometer-outline" size={16} color={colors.saffron[600]} />
-                <Text style={styles.weatherDetailText}>{weather.windSpeed} km/h</Text>
+                <Text style={styles.weatherDetailText}>{Number(weather.windSpeed).toFixed(1)} km/h</Text>
               </View>
               <View style={styles.weatherDetailItem}>
                 <Ionicons name="eye-outline" size={16} color={colors.saffron[600]} />
-                <Text style={styles.weatherDetailText}>{weather.visibility} km</Text>
+                <Text style={styles.weatherDetailText}>{Number(weather.visibility).toFixed(1)} km</Text>
               </View>
               <View style={styles.weatherDetailItem}>
                 <Ionicons name="thermometer-outline" size={16} color={colors.saffron[600]} />
@@ -321,13 +368,18 @@ const styles = StyleSheet.create({
     color: colors.gray[600],
     marginLeft: 4,
   },
-  notificationBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
   },
   searchContainer: {
     flexDirection: 'row',
