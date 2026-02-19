@@ -11,43 +11,51 @@ import { router } from 'expo-router';
 import { useAuthStore } from '@/lib/store';
 import colors from '@/lib/colors';
 
-const menuSections = [
-  {
-    title: 'Services',
-    items: [
-      { id: 'maharaj', title: 'Maharaj Saheb', icon: 'person-circle', color: '#f59e0b' },
-      { id: 'jain-news', title: 'Jain News', icon: 'newspaper', color: '#dc2626' },
-      { id: 'matrimony', title: 'Matrimony', icon: 'heart-circle', color: '#f43f5e' },
-      { id: 'tirth', title: 'Tirth & Dharamshala', icon: 'location', color: '#14b8a6' },
-      { id: 'store', title: 'Jain Store', icon: 'cart', color: '#22c55e' },
-      { id: 'jobs', title: 'Jobs', icon: 'briefcase', color: '#6366f1' },
-      { id: 'pachchkan', title: 'Pachchkan', icon: 'musical-notes', color: '#f59e0b' },
-      { id: 'property', title: 'Property', icon: 'home', color: '#7c3aed' },
-    ],
-  },
-  {
-    title: 'Community',
-    items: [
-      { id: 'posts', title: 'Posts & Blog', icon: 'newspaper', color: '#f97316' },
-      { id: 'donations', title: 'Donations', icon: 'heart', color: '#ec4899' },
-      { id: 'panchang', title: 'Panchang', icon: 'calendar', color: '#f59e0b' },
-    ],
-  },
-  {
-    title: 'Account',
-    items: [
-      { id: 'profile', title: 'My Profile', icon: 'person', color: '#64748b' },
-      { id: 'wallet', title: 'Wallet & Points', icon: 'wallet', color: '#f97316' },
-      { id: 'subscription', title: 'Premium Plans', icon: 'diamond', color: '#8b5cf6' },
-      { id: 'admin', title: 'Admin Panel', icon: 'shield-checkmark', color: '#dc2626' },
-      { id: 'settings', title: 'Settings', icon: 'settings', color: '#6b7280' },
-      { id: 'help', title: 'Help & Support', icon: 'help-circle', color: '#3b82f6' },
-    ],
-  },
-];
+const ADMIN_ROLES = ['SUPER_ADMIN', 'SANGH_ADMIN', 'TRUST_ADMIN', 'MATRIMONY_ADMIN'];
+
+const getMenuSections = (userRole?: string) => {
+  const sections = [
+    {
+      title: 'Services',
+      items: [
+        { id: 'maharaj', title: 'Maharaj Saheb', icon: 'person-circle', color: '#f59e0b' },
+        { id: 'jain-news', title: 'Jain News', icon: 'newspaper', color: '#dc2626' },
+        { id: 'matrimony', title: 'Matrimony', icon: 'heart-circle', color: '#f43f5e' },
+        { id: 'tirth', title: 'Tirth & Dharamshala', icon: 'location', color: '#14b8a6' },
+        { id: 'store', title: 'Jain Store', icon: 'cart', color: '#22c55e' },
+        { id: 'jobs', title: 'Jobs', icon: 'briefcase', color: '#6366f1' },
+        { id: 'pachchkan', title: 'Pachchkan', icon: 'musical-notes', color: '#f59e0b' },
+        { id: 'property', title: 'Property', icon: 'home', color: '#7c3aed' },
+      ],
+    },
+    {
+      title: 'Community',
+      items: [
+        { id: 'posts', title: 'Posts & Blog', icon: 'newspaper', color: '#f97316' },
+        { id: 'donations', title: 'Donations', icon: 'heart', color: '#ec4899' },
+        { id: 'panchang', title: 'Panchang', icon: 'calendar', color: '#f59e0b' },
+      ],
+    },
+    {
+      title: 'Account',
+      items: [
+        { id: 'profile', title: 'My Profile', icon: 'person', color: '#64748b' },
+        { id: 'wallet', title: 'Wallet & Points', icon: 'wallet', color: '#f97316' },
+        { id: 'subscription', title: 'Premium Plans', icon: 'diamond', color: '#8b5cf6' },
+        ...(userRole && ADMIN_ROLES.includes(userRole)
+          ? [{ id: 'admin', title: 'Admin Panel', icon: 'shield-checkmark', color: '#dc2626' }]
+          : []),
+        { id: 'settings', title: 'Settings', icon: 'settings', color: '#6b7280' },
+        { id: 'help', title: 'Help & Support', icon: 'help-circle', color: '#3b82f6' },
+      ],
+    },
+  ];
+  return sections;
+};
 
 export default function MoreScreen() {
   const { user, logout } = useAuthStore();
+  const menuSections = getMenuSections(user?.role);
 
   const handlePress = (id: string) => {
     switch (id) {

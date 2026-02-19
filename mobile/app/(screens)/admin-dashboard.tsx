@@ -42,6 +42,7 @@ const ADMIN_MODULES = [
   { id: 'maharaj', title: 'Maharaj Saheb', desc: 'Update locations, planner, events', icon: 'person-circle', color: colors.saffron[500], route: '/(screens)/admin-maharaj', badge: 3 },
   { id: 'users', title: 'User Management', desc: 'View and manage user accounts', icon: 'people', color: colors.blue[500], route: '/(screens)/admin-users' },
   { id: 'matrimony', title: 'Matrimony Profiles', desc: 'Verify and moderate profiles', icon: 'heart-circle', color: colors.pink[500], route: '/(screens)/admin-matrimony' },
+  { id: 'panchang', title: 'Panchang Data', desc: 'Add and update daily panchang', icon: 'calendar', color: colors.yellow[500], route: '/(screens)/admin-panchang' },
   { id: 'reports', title: 'Reports & Analytics', desc: 'View app usage and analytics', icon: 'bar-chart', color: colors.green[500], route: '/(screens)/admin-reports' },
 ];
 

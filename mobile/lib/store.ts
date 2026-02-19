@@ -114,7 +114,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           // If API fails, use demo login (for offline/demo mode)
           console.log('Using demo login mode');
 
-          // Create a demo user for testing
+          // Create a demo user for testing (SUPER_ADMIN for demo access to admin panel)
           const demoUser: User = {
             id: 'demo-' + phone,
             phone: phone,
@@ -122,7 +122,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
             firstName: 'Demo',
             lastName: 'User',
             profilePhoto: null,
-            role: 'USER',
+            role: 'SUPER_ADMIN',
             status: 'ACTIVE',
           };
 
