@@ -15,10 +15,13 @@ const menuSections = [
   {
     title: 'Services',
     items: [
+      { id: 'maharaj', title: 'Maharaj Saheb', icon: 'person-circle', color: '#f59e0b' },
+      { id: 'jain-news', title: 'Jain News', icon: 'newspaper', color: '#dc2626' },
       { id: 'matrimony', title: 'Matrimony', icon: 'heart-circle', color: '#f43f5e' },
       { id: 'tirth', title: 'Tirth & Dharamshala', icon: 'location', color: '#14b8a6' },
       { id: 'store', title: 'Jain Store', icon: 'cart', color: '#22c55e' },
       { id: 'jobs', title: 'Jobs', icon: 'briefcase', color: '#6366f1' },
+      { id: 'pachchkan', title: 'Pachchkan', icon: 'musical-notes', color: '#f59e0b' },
       { id: 'property', title: 'Property', icon: 'home', color: '#7c3aed' },
     ],
   },
@@ -34,6 +37,9 @@ const menuSections = [
     title: 'Account',
     items: [
       { id: 'profile', title: 'My Profile', icon: 'person', color: '#64748b' },
+      { id: 'wallet', title: 'Wallet & Points', icon: 'wallet', color: '#f97316' },
+      { id: 'subscription', title: 'Premium Plans', icon: 'diamond', color: '#8b5cf6' },
+      { id: 'admin', title: 'Admin Panel', icon: 'shield-checkmark', color: '#dc2626' },
       { id: 'settings', title: 'Settings', icon: 'settings', color: '#6b7280' },
       { id: 'help', title: 'Help & Support', icon: 'help-circle', color: '#3b82f6' },
     ],
@@ -65,6 +71,27 @@ export default function MoreScreen() {
         break;
       case 'jobs':
         router.push('/jobs');
+        break;
+      case 'pachchkan':
+        router.push('/pachchkan');
+        break;
+      case 'wallet':
+        router.push('/wallet');
+        break;
+      case 'subscription':
+        router.push('/subscription');
+        break;
+      case 'posts':
+        router.push('/posts');
+        break;
+      case 'maharaj':
+        router.push('/maharaj');
+        break;
+      case 'jain-news':
+        router.push('/jain-news');
+        break;
+      case 'admin':
+        router.push('/(screens)/admin-dashboard' as any);
         break;
       default:
         break;

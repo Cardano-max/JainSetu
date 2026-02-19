@@ -2,114 +2,42 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Image,
   FlatList,
-  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import colors from '@/lib/colors';
-import { useAuthStore } from '@/lib/store';
+import { DEMO_MATRIMONY_PROFILES } from '@/lib/demoData/matrimony';
+import type { MatrimonyProfile } from '@/lib/types/matrimony';
 
-interface MatrimonyProfile {
-  id: string;
-  name: string;
-  age: number;
-  gender: 'male' | 'female';
-  height: string;
-  education: string;
-  occupation: string;
-  city: string;
-  gotra: string;
-  maritalStatus: string;
-  about?: string;
-  imageUrl?: string;
-  isVerified: boolean;
-}
-
-const FILTERS = ['All', 'Male', 'Female'];
+const FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'male', label: 'Male' },
+  { id: 'female', label: 'Female' },
+  { id: 'verified', label: 'Verified' },
+  { id: 'premium', label: 'Premium' },
+];
 
 export default function MatrimonyScreen() {
-  const { isAuthenticated } = useAuthStore();
   const [profiles, setProfiles] = useState<MatrimonyProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState('All');
-  const [selectedProfile, setSelectedProfile] = useState<MatrimonyProfile | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchProfiles = useCallback(async () => {
     try {
       const response = await api.get('/matrimony/profiles');
       setProfiles(response?.profiles || []);
-    } catch (error) {
-      console.error('Failed to fetch profiles:', error);
-      // Demo data
-      setProfiles([
-        {
-          id: '1',
-          name: 'Priya Shah',
-          age: 26,
-          gender: 'female',
-          height: "5'4\"",
-          education: 'MBA - Finance',
-          occupation: 'Bank Manager',
-          city: 'Surat',
-          gotra: 'Oswal',
-          maritalStatus: 'Never Married',
-          about: 'Simple, family-oriented girl looking for a compatible life partner.',
-          isVerified: true,
-        },
-        {
-          id: '2',
-          name: 'Rahul Jain',
-          age: 28,
-          gender: 'male',
-          height: "5'10\"",
-          education: 'B.Tech - Computer Science',
-          occupation: 'Software Engineer',
-          city: 'Ahmedabad',
-          gotra: 'Porwal',
-          maritalStatus: 'Never Married',
-          about: 'Working in a reputed IT company, looking for an educated life partner.',
-          isVerified: true,
-        },
-        {
-          id: '3',
-          name: 'Anita Mehta',
-          age: 24,
-          gender: 'female',
-          height: "5'3\"",
-          education: 'CA',
-          occupation: 'Chartered Accountant',
-          city: 'Mumbai',
-          gotra: 'Agarwal',
-          maritalStatus: 'Never Married',
-          about: 'Professionally qualified, looking for someone with similar values.',
-          isVerified: false,
-        },
-        {
-          id: '4',
-          name: 'Vikram Shah',
-          age: 30,
-          gender: 'male',
-          height: "5'8\"",
-          education: 'MD - Medicine',
-          occupation: 'Doctor',
-          city: 'Rajkot',
-          gotra: 'Oswal',
-          maritalStatus: 'Never Married',
-          about: 'Doctor by profession, looking for an understanding life partner.',
-          isVerified: true,
-        },
-      ]);
+    } catch {
+      setProfiles(DEMO_MATRIMONY_PROFILES);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -120,26 +48,27 @@ export default function MatrimonyScreen() {
     fetchProfiles();
   }, [fetchProfiles]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchProfiles();
-  };
-
   const filteredProfiles = profiles.filter((p) => {
-    if (selectedFilter === 'All') return true;
-    return p.gender === selectedFilter.toLowerCase();
+    if (selectedFilter === 'male') return p.gender === 'male';
+    if (selectedFilter === 'female') return p.gender === 'female';
+    if (selectedFilter === 'verified') return p.isVerified;
+    if (selectedFilter === 'premium') return p.isPremium;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.city.toLowerCase().includes(q) ||
+        (p.work?.occupation || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
   });
-
-  const viewProfile = (profile: MatrimonyProfile) => {
-    setSelectedProfile(profile);
-    setShowDetail(true);
-  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: 'Matrimony' }} />
-        <View style={styles.loadingContainer}>
+        <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.saffron[600]} />
         </View>
       </SafeAreaView>
@@ -150,30 +79,39 @@ export default function MatrimonyScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen options={{ title: 'Matrimony' }} />
 
-      {/* Filter Tabs */}
-      <View style={styles.filterContainer}>
-        {FILTERS.map((filter) => (
+      {/* Search */}
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={20} color={colors.gray[400]} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by name, city, profession..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor={colors.gray[400]}
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color={colors.gray[400]} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* Filters */}
+      <View style={styles.filterRow}>
+        {FILTERS.map((f) => (
           <TouchableOpacity
-            key={filter}
-            style={[
-              styles.filterTab,
-              selectedFilter === filter && styles.filterTabActive,
-            ]}
-            onPress={() => setSelectedFilter(filter)}
+            key={f.id}
+            style={[styles.filterChip, selectedFilter === f.id && styles.filterChipActive]}
+            onPress={() => setSelectedFilter(f.id)}
           >
-            <Text
-              style={[
-                styles.filterTabText,
-                selectedFilter === filter && styles.filterTabTextActive,
-              ]}
-            >
-              {filter}
+            <Text style={[styles.filterText, selectedFilter === f.id && styles.filterTextActive]}>
+              {f.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Profile List */}
+      {/* Profile Grid */}
       <FlatList
         data={filteredProfiles}
         keyExtractor={(item) => item.id}
@@ -181,137 +119,61 @@ export default function MatrimonyScreen() {
         columnWrapperStyle={styles.row}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.profileCard}
-            onPress={() => viewProfile(item)}
+            style={styles.card}
+            onPress={() => router.push({ pathname: '/(screens)/matrimony-detail', params: { id: item.id } })}
           >
-            <View style={styles.profileImageContainer}>
-              <View style={styles.profileImagePlaceholder}>
-                <Ionicons
-                  name={item.gender === 'female' ? 'woman' : 'man'}
-                  size={40}
-                  color={colors.saffron[400]}
-                />
-              </View>
+            <View style={styles.cardImage}>
+              <Ionicons
+                name={item.gender === 'female' ? 'woman' : 'man'}
+                size={40}
+                color={colors.saffron[400]}
+              />
+              {item.isPremium && (
+                <View style={styles.premiumBadge}>
+                  <Ionicons name="diamond" size={10} color={colors.white} />
+                </View>
+              )}
               {item.isVerified && (
                 <View style={styles.verifiedBadge}>
                   <Ionicons name="checkmark-circle" size={18} color={colors.green[500]} />
                 </View>
               )}
             </View>
-            <Text style={styles.profileName}>{item.name}</Text>
-            <Text style={styles.profileDetails}>
-              {item.age} yrs • {item.height}
+            <Text style={styles.cardName}>{item.name}</Text>
+            <Text style={styles.cardDetails}>{item.age} yrs • {item.height}</Text>
+            <Text style={styles.cardCity}>
+              <Ionicons name="location" size={10} color={colors.gray[400]} /> {item.city}
             </Text>
-            <Text style={styles.profileCity}>{item.city}</Text>
-            <Text style={styles.profileOccupation} numberOfLines={1}>
-              {item.occupation}
+            <Text style={styles.cardProfession} numberOfLines={1}>
+              {item.work?.occupation || item.education.degree}
             </Text>
+            {item.sect && (
+              <View style={styles.cardSect}>
+                <Text style={styles.cardSectText}>{item.sect}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         )}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); fetchProfiles(); }}
+          />
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
+          <View style={styles.center}>
             <Ionicons name="heart-outline" size={64} color={colors.gray[300]} />
             <Text style={styles.emptyText}>No profiles found</Text>
           </View>
         }
       />
 
-      {/* Profile Detail Modal */}
-      <Modal
-        visible={showDetail}
-        animationType="slide"
-        onRequestClose={() => setShowDetail(false)}
+      {/* Create Biodata FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/(screens)/matrimony-create')}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowDetail(false)}>
-              <Ionicons name="close" size={24} color={colors.gray[700]} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Profile Details</Text>
-            <TouchableOpacity>
-              <Ionicons name="heart-outline" size={24} color={colors.saffron[600]} />
-            </TouchableOpacity>
-          </View>
-
-          {selectedProfile && (
-            <ScrollView style={styles.modalContent}>
-              <View style={styles.modalProfileImage}>
-                <Ionicons
-                  name={selectedProfile.gender === 'female' ? 'woman' : 'man'}
-                  size={80}
-                  color={colors.saffron[400]}
-                />
-              </View>
-
-              <View style={styles.modalProfileHeader}>
-                <Text style={styles.modalProfileName}>{selectedProfile.name}</Text>
-                {selectedProfile.isVerified && (
-                  <View style={styles.verifiedTag}>
-                    <Ionicons name="checkmark-circle" size={14} color={colors.green[500]} />
-                    <Text style={styles.verifiedText}>Verified</Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.detailsGrid}>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Age</Text>
-                  <Text style={styles.detailValue}>{selectedProfile.age} years</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Height</Text>
-                  <Text style={styles.detailValue}>{selectedProfile.height}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>City</Text>
-                  <Text style={styles.detailValue}>{selectedProfile.city}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Gotra</Text>
-                  <Text style={styles.detailValue}>{selectedProfile.gotra}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Education</Text>
-                  <Text style={styles.detailValue}>{selectedProfile.education}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Occupation</Text>
-                  <Text style={styles.detailValue}>{selectedProfile.occupation}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Marital Status</Text>
-                  <Text style={styles.detailValue}>{selectedProfile.maritalStatus}</Text>
-                </View>
-              </View>
-
-              {selectedProfile.about && (
-                <View style={styles.aboutSection}>
-                  <Text style={styles.aboutLabel}>About</Text>
-                  <Text style={styles.aboutText}>{selectedProfile.about}</Text>
-                </View>
-              )}
-
-              <View style={styles.actionButtons}>
-                <TouchableOpacity style={styles.interestButton}>
-                  <Ionicons name="heart" size={20} color={colors.white} />
-                  <Text style={styles.interestButtonText}>Express Interest</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.contactButton}>
-                  <Ionicons name="chatbubble" size={20} color={colors.saffron[600]} />
-                  <Text style={styles.contactButtonText}>Contact</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          )}
-        </SafeAreaView>
-      </Modal>
-
-      {/* Register Profile FAB */}
-      <TouchableOpacity style={styles.fab}>
         <Ionicons name="add" size={24} color={colors.white} />
       </TouchableOpacity>
     </SafeAreaView>
@@ -319,239 +181,31 @@ export default function MatrimonyScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.saffron[50],
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: colors.white,
-  },
-  filterTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-    marginHorizontal: 4,
-    backgroundColor: colors.gray[100],
-  },
-  filterTabActive: {
-    backgroundColor: colors.saffron[600],
-  },
-  filterTabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.gray[700],
-  },
-  filterTabTextActive: {
-    color: colors.white,
-  },
-  listContent: {
-    padding: 8,
-  },
-  row: {
-    justifyContent: 'space-between',
-  },
-  profileCard: {
-    width: '48%',
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  profileImageContainer: {
-    position: 'relative',
-    marginBottom: 12,
-  },
-  profileImagePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.saffron[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  verifiedBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: colors.white,
-    borderRadius: 10,
-  },
-  profileName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.gray[900],
-  },
-  profileDetails: {
-    fontSize: 13,
-    color: colors.gray[600],
-    marginTop: 2,
-  },
-  profileCity: {
-    fontSize: 12,
-    color: colors.gray[500],
-    marginTop: 2,
-  },
-  profileOccupation: {
-    fontSize: 12,
-    color: colors.saffron[600],
-    marginTop: 4,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: colors.gray[500],
-    marginTop: 16,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.gray[900],
-  },
-  modalContent: {
-    flex: 1,
-  },
-  modalProfileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.saffron[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 24,
-  },
-  modalProfileHeader: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  modalProfileName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.gray[900],
-  },
-  verifiedTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  verifiedText: {
-    fontSize: 12,
-    color: colors.green[600],
-    marginLeft: 4,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 20,
-  },
-  detailItem: {
-    width: '50%',
-    marginBottom: 16,
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: colors.gray[500],
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.gray[900],
-    marginTop: 2,
-  },
-  aboutSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  aboutLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.gray[900],
-    marginBottom: 8,
-  },
-  aboutText: {
-    fontSize: 14,
-    color: colors.gray[600],
-    lineHeight: 22,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  interestButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.saffron[600],
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  interestButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  contactButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.saffron[50],
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginLeft: 8,
-    borderWidth: 1,
-    borderColor: colors.saffron[600],
-  },
-  contactButtonText: {
-    color: colors.saffron[600],
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.saffron[600],
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
+  container: { flex: 1, backgroundColor: colors.saffron[50] },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyText: { fontSize: 16, color: colors.gray[500], marginTop: 16 },
+  // Search
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: colors.gray[900] },
+  // Filters
+  filterRow: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 12 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.white, marginHorizontal: 4, borderWidth: 1, borderColor: colors.gray[200] },
+  filterChipActive: { backgroundColor: colors.saffron[600], borderColor: colors.saffron[600] },
+  filterText: { fontSize: 13, color: colors.gray[700] },
+  filterTextActive: { color: colors.white, fontWeight: '600' },
+  // Grid
+  listContent: { padding: 8 },
+  row: { justifyContent: 'space-between' },
+  card: { width: '48%', backgroundColor: colors.white, borderRadius: 12, padding: 12, marginBottom: 12, alignItems: 'center' },
+  cardImage: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.saffron[100], justifyContent: 'center', alignItems: 'center', position: 'relative', marginBottom: 10 },
+  premiumBadge: { position: 'absolute', top: 0, left: 0, backgroundColor: colors.saffron[500], borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  verifiedBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.white, borderRadius: 10 },
+  cardName: { fontSize: 15, fontWeight: '600', color: colors.gray[900] },
+  cardDetails: { fontSize: 12, color: colors.gray[600], marginTop: 2 },
+  cardCity: { fontSize: 11, color: colors.gray[500], marginTop: 2 },
+  cardProfession: { fontSize: 12, color: colors.saffron[600], marginTop: 4 },
+  cardSect: { marginTop: 6, backgroundColor: colors.saffron[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  cardSectText: { fontSize: 10, color: colors.saffron[700] },
+  // FAB
+  fab: { position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.saffron[600], justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
 });

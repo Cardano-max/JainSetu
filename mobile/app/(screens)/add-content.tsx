@@ -163,7 +163,15 @@ export default function AddContentScreen() {
               styles.optionCard,
               selectedType === option.id && styles.optionCardSelected,
             ]}
-            onPress={() => setSelectedType(option.id)}
+            onPress={() => {
+              if (option.id === 'matrimony') {
+                router.push('/(screens)/matrimony-create');
+              } else if (option.id === 'job') {
+                router.push('/(screens)/job-post');
+              } else {
+                setSelectedType(option.id);
+              }
+            }}
           >
             <View style={[styles.optionIcon, { backgroundColor: `${option.color}15` }]}>
               <Ionicons name={option.icon as any} size={28} color={option.color} />

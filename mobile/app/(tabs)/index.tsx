@@ -20,6 +20,7 @@ import { useLocationWeather } from '@/lib/useLocationWeather';
 import { weatherService } from '@/lib/weather';
 import Stories from '@/components/Stories';
 import HomeSlider from '@/components/HomeSlider';
+import { DEMO_NEWS } from '@/lib/demoData/news';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +34,8 @@ interface PanchangData {
 }
 
 const menuItems = [
+  { id: 'maharaj', title: 'Maharaj Saheb', icon: 'person-circle', color: '#f59e0b' },
+  { id: 'jain-news', title: 'Jain News', icon: 'newspaper', color: '#dc2626' },
   { id: 'panchang', title: 'Panchang', icon: 'calendar', color: '#f59e0b' },
   { id: 'events', title: 'Events', icon: 'star', color: '#3b82f6' },
   { id: 'directory', title: 'Directory', icon: 'id-card', color: '#10b981' },
@@ -41,10 +44,12 @@ const menuItems = [
   { id: 'matrimony', title: 'Matrimony', icon: 'heart-circle', color: '#f43f5e' },
   { id: 'tirth', title: 'Tirth & Dharamshala', icon: 'location', color: '#14b8a6' },
   { id: 'jobs', title: 'Jobs', icon: 'briefcase', color: '#6366f1' },
+  { id: 'pachchkan', title: 'Pachchkan', icon: 'musical-notes', color: '#f59e0b' },
   { id: 'festival-post', title: 'Festival Post', icon: 'sparkles', color: '#f97316' },
-  { id: 'posts', title: 'Posts & Blog', icon: 'newspaper', color: '#ea580c' },
+  { id: 'posts', title: 'Posts & Blog', icon: 'create', color: '#ea580c' },
   { id: 'store', title: 'Store', icon: 'cart', color: '#22c55e' },
   { id: 'messenger', title: 'Messages', icon: 'chatbubbles', color: '#0ea5e9' },
+  { id: 'wallet', title: 'Wallet', icon: 'wallet', color: '#f97316' },
   { id: 'travel', title: 'Travel & Recharge', icon: 'airplane', color: '#06b6d4' },
   { id: 'insurance', title: 'Insurance', icon: 'shield-checkmark', color: '#dc2626' },
   { id: 'property', title: 'Property', icon: 'home', color: '#7c3aed' },
@@ -120,6 +125,18 @@ export default function HomeScreen() {
       case 'posts':
         router.push('/(screens)/posts');
         break;
+      case 'pachchkan':
+        router.push('/(screens)/pachchkan');
+        break;
+      case 'wallet':
+        router.push('/(screens)/wallet');
+        break;
+      case 'maharaj':
+        router.push('/(screens)/maharaj');
+        break;
+      case 'jain-news':
+        router.push('/(screens)/jain-news');
+        break;
       default:
         break;
     }
@@ -192,6 +209,43 @@ export default function HomeScreen() {
 
         {/* Home Slider - Recent modules, Ads, Posts */}
         <HomeSlider />
+
+        {/* Jain News Slider */}
+        <View style={styles.newsSection}>
+          <View style={styles.newsSectionHeader}>
+            <Text style={styles.newsSectionTitle}>Jain News</Text>
+            <TouchableOpacity onPress={() => router.push('/(screens)/jain-news')}>
+              <Text style={styles.newsSeeAll}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}>
+            {DEMO_NEWS.slice(0, 5).map((news) => (
+              <TouchableOpacity
+                key={news.id}
+                style={styles.newsCard}
+                onPress={() => router.push({ pathname: '/(screens)/news-detail', params: { id: news.id } })}
+              >
+                <View style={styles.newsImagePlaceholder}>
+                  <Ionicons name="newspaper" size={28} color={colors.gray[300]} />
+                  {news.isBreaking && (
+                    <View style={styles.newsBreakingBadge}>
+                      <Text style={styles.newsBreakingText}>BREAKING</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.newsCardContent}>
+                  <Text style={styles.newsCardTitle} numberOfLines={2}>{news.title}</Text>
+                  <Text style={styles.newsCardMeta}>{news.author} · {news.publishedAt}</Text>
+                  <View style={styles.newsCardReactions}>
+                    <Text style={styles.newsCardReactionText}>
+                      {news.reactions.slice(0, 3).map((r) => r.emoji).join(' ')} {news.reactions.reduce((s, r) => s + r.count, 0).toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Weather & Time Card */}
         <View style={styles.weatherCard}>
@@ -597,4 +651,18 @@ const styles = StyleSheet.create({
     color: colors.gray[700],
     textAlign: 'center',
   },
+  // News Slider
+  newsSection: { marginBottom: 16 },
+  newsSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 },
+  newsSectionTitle: { fontSize: 18, fontWeight: '700', color: colors.gray[900] },
+  newsSeeAll: { fontSize: 14, fontWeight: '600', color: colors.saffron[600] },
+  newsCard: { width: 260, backgroundColor: colors.white, borderRadius: 12, marginRight: 12, overflow: 'hidden' },
+  newsImagePlaceholder: { height: 120, backgroundColor: colors.gray[100], justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  newsBreakingBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: colors.red[500], paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
+  newsBreakingText: { fontSize: 9, fontWeight: '800', color: colors.white },
+  newsCardContent: { padding: 12 },
+  newsCardTitle: { fontSize: 14, fontWeight: '600', color: colors.gray[900], lineHeight: 20 },
+  newsCardMeta: { fontSize: 11, color: colors.gray[500], marginTop: 6 },
+  newsCardReactions: { marginTop: 6 },
+  newsCardReactionText: { fontSize: 12, color: colors.gray[600] },
 });
